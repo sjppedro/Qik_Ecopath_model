@@ -1,0 +1,795 @@
+---
+title: "Primary production and detritus"
+author: "Sara Pedro"
+date: "03/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo =FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(readxl) # Load the readxl package
+
+setwd("C:/Users/Sara/Google Drive/PostDoc-QC/Data gathering/Models/BaffinBay_tech_report/WBB_Ecopath_model_files") #set your working directory here
+
+
+```
+
+The full citation corresponding to the literature cited in this file can be found in the Ecopath technical report for this project.
+
+
+### Functional Groups
+
+- Sea ice algae
+- Phytoplankton
+- Bacteria
+- Detritus
+
+
+#### Opensource data from GreenEdge Project
+
+https://www.seanoe.org/data/00487/59892/
+
+The GreenEdge project measured chla concentrations and primary production in an ice camp (sea ice algae) near Qik and in open water on board of the Amundsen. This is the only existing empirical data for Baffin Bay near and within the model area. 
+
+
+## Sea ice algae
+
+**Biomass**: 
+
+Deal et al. (2011) coupled an ice ecosystem model to a global dynamic sea ice model to assess the primary production and ice algal biomass within the Arctic ocean. Using estimated latitude averaged ice chlorophyll-a biomass (Deal et al. 2011), the simulated biomass for 70 latitude was estimated as 7.35 mg.Chl.m-2. Assuming an ice algae weight: Chl-a ratio of 400 (O’Reilly and Dow 2006), ice algae biomass was estimated as 2.94 t.km-2.y-1.
+
+
+From the GreenEdge project:
+
+TChla (0–3 cm), slightly increased until reaching a maximum just before the snow melt onset (26 mg m–2 on 27 May 2015; 6 mg m–2 on 30 May 2016). After the snow melt onset, TChla (0–3 cm) decreased to values less than 10 mg m–2 in 2015 and less than 2 mg m–2  in 2016. Overall, the averaged sea ice algal biomass was about four times lower in 2016 (1.95 ± 1.45 mg m–2) than in 2015 (8.33 ± 5.88 mg m–2) (Oziel et al 2019).
+
+
+For my models I will use the GreenEdge data and average calculations done by Saint-Béat et al 2020:
+
+```{r}
+#################################################################################################
+# Ice camp
+#################################################################################################
+
+#Data cleaning to calculate chla concentrations from Ice Camp near Qikiqtarjuaq (from GreenEdge Project)
+# Chla in ug/L
+
+dataChl_IC_2015<-read_excel("Chl_IC_2015.xlsx",sheet=1)%>%
+                janitor::clean_names()%>%
+                rename(date=sampling_date_yyyy_mm_dd, type=water_or_ice, depth=depth_m, chla=chla_ug_l , phaeo=phaeo_ug_l)%>%
+                select(date,type, depth, chla, phaeo)%>%
+                filter(type %in% c ("Water","underice"),chla!="NA")
+
+dataChl_IC_2015$depth[is.na(dataChl_IC_2015$depth)]<-0 
+dataChl_IC_2015$depth <-as.numeric(dataChl_IC_2015$depth)
+dataChl_IC_2015$chla  <-as.numeric(dataChl_IC_2015$chla)
+dataChl_IC_2015$phaeo <-as.numeric(dataChl_IC_2015$phaeo)
+dataChl_IC_2015$date  <-as.Date(dataChl_IC_2015$date)
+
+dataChl_IC_2015<-filter(dataChl_IC_2015, date >="2015-06-09") #measurements in 2015
+
+dataChl_IC_2016<-read_excel("Chl_IC_2016.xlsx",sheet=1)%>%
+                 janitor::clean_names()%>%
+                 rename(date=date_yyyy_mm_dd, type=water_or_ice, depth=depth_m, chla=chla_ug_l , phaeo=phaeo_ug_l)%>%
+                 select(date,type, depth, chla, phaeo)%>%
+                 filter(type=="water", chla!="NA") #for 2016
+
+
+dataChl_IC_2016$depth[(dataChl_IC_2016$depth) %in% c("under ice","underice")]<-0 
+dataChl_IC_2016$depth <-as.numeric(dataChl_IC_2016$depth)
+dataChl_IC_2016$chla  <-as.numeric(dataChl_IC_2016$chla)
+dataChl_IC_2016$phaeo <-as.numeric(dataChl_IC_2016$phaeo)
+dataChl_IC_2016$date  <-as.Date(dataChl_IC_2016$date)
+
+dataChl_IC_2016<-filter(dataChl_IC_2016, date >="2016-06-09") #measurements in 2016
+
+dataChl_IC<-bind_rows(dataChl_IC_2015, dataChl_IC_2016) #joining data from both years
+
+dataChl_IC_m<-filter(dataChl_IC,depth<=50) # I am interested in a depth equal or less than 50 m 
+res_Chl_IC_m<-mean(dataChl_IC_m$chla, na.rm=TRUE) ##mean chla concentration used to estimate production of zooplankton             
+
+dataChl_IC$chla<-dataChl_IC$chla*1000 #to have chla concentrations in ugChla.m-3
+
+
+#This function is used to do trapezoidal integration, which allows to calculate total abundance when measured at different depths (by Blanche Saint-Béat); it basically converts m-3 to m-2
+
+Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+} 
+
+
+dfChl_IC     <- group_by(dataChl_IC, date )
+Chl_IC_euz   <- summarise(dfChl_IC, Chl = Pint(chla, depth)) #Chla concentrations at the euphotic zone in 2015 and 2016 in the ice camp - these are the values I am using - we only have data for the euphotic zone for the ice camp so no need to specify here
+
+res_Chl_IC<-c(Mean_chl=mean(Chl_IC_euz$Chl,na.rm=TRUE),med=median(Chl_IC_euz$Chl,na.rm=TRUE),Q_5=quantile(Chl_IC_euz$Chl,probs=0.05, na.rm=TRUE),Q_95=quantile(Chl_IC_euz$Chl,probs=0.95, na.rm=TRUE))
+
+res_Chl_IC #in ugChla.m-2
+
+
+```
+
+
+I used the conversions that Hoover used in the models for Hudson Bay and Western Arctic:
+
+Chla = 1.5 % AFDW (Farabee 2001) or ccarbon:chla = 53	(Kang 2001) and ice algae carbon:chla = 20-35 (average 27.5)
+1 gC = 2 gAFDW (Cauffopé and Heymans 2005)
+0.1 gC = 0.2 g dry weight = 1 g wet weight (Mathews and Heimdal, 1980 in North Sea technical report) 
+or
+1 gC = 9 gWW 	(Strathmann, R.R., 1967. Estimating the organic carbon content of phytoplankton from cell volume or plasma volume. Limnology and Oceanography 12(3): 411-418.)
+
+```{r}
+
+biomass_ice_chla <- 111151.604/1000 #ug chla m-2 to mg of chla m-2
+biomass_ice_Q5_chla <- 7675.216/1000 
+biomass_ice_Q95_chla <- 304874.280/1000 
+
+# Convert sea ice algae weight based on Chla (based on carbon:chla of 27.5), gC to gWW and to ton ww km-2 year-1
+
+biomass_ice <- (((biomass_ice_chla*27.5*0.001)*9)*(1.10231e-6/1e-6))/4/2 # I am assuming the biomass was 30 ton ww km-2 in the summer so I divided by 4 to get the whole year (4 seasons) assuming there is only primary production in the summer; I am also roughly assuming that half of that biomass is phytoplankton
+biomass_ice_Q5 <- (((biomass_ice_Q5_chla*27.5*0.001)*9)*(1.10231e-6/1e-6))/4/2
+biomass_ice_Q95 <- (((biomass_ice_Q95_chla*27.5*0.001)*9)*(1.10231e-6/1e-6))/4/2
+
+
+```
+
+
+**P/B**: 
+
+Deal et al. (2011) used global dynamic sea ice model to estimated ice algae primary production for the Canadian Arctic > 62°N as 2.7 gC.m-2.y-1,  while Bergmann et al. (1991) estimated it as 5 g C m-2 yr-1 for the eastern Canadian Arctic.
+
+Nozais et al 2001 and Michel et al 2002 (in Arrigo 2017 - Sea ice as a habitat for primary producers) calculated a production range from 26-317 mgC m-2 day-1 and 2-150 mgC m-2 day-1, respectively, for the North Water Polynya. Note that the North Water is one of the most productive areas above the Arctic circle, so perhaps more productive than my model area.  
+
+Once more, for my models I will use the GreenEdge data and average calculations done by Saint-Béat et al 2020:
+
+```{r}
+
+###Sea ice Algae
+
+dataPP_SIA  <- read_csv("PP_IC_ice.csv") %>%
+  select(Date, Depth, Pprimaire_ugC_L_d) %>% 
+  filter(Depth=="ice", Date >="2016-06-09") #primary production of sea ice algae in ugC L-1 day-1 within the ice and in the peak-month of measurements
+
+dataPP_SIA$PP<-dataPP_SIA$Pprimaire_ugC_L_d*1000 #convert to ugC m-3 day-1
+
+#same function as above
+
+Pday <- function(X, Z) {
+  
+  N    <- length(X)
+  
+  dZ <- c( 1, as.numeric( diff(Z[1:N])))
+  
+  dX <- c( X[1], ( X[1:(N-1)] + X[2:N] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+
+res_PP_SIA<-Pday(dataPP_SIA$PP,dataPP_SIA$Date) #in ugC m-2 month-1
+
+Mean_PP_SIA<- mean(dataPP_SIA$PP)*30 
+
+
+```
+
+
+
+Conversions
+
+```{r}
+
+# Convert ugC m-2 month-1 to ton ww km-2 year-1
+
+PP_ice_algae <- (res_PP_SIA*1e-6)*9*4 #multiply by 4 assuming the algae produce during the summer months
+
+PB_ice_algae <- PP_ice_algae/biomass_ice  
+
+
+```
+
+
+## Phytoplankton
+
+**Biomass**: 
+
+Phytoplankton biomass and production, averaged for the euphotic zone in Baffin Bay, were 1.26 mg Chl. m-3 (57 mg m-2) and 7.4 mg C m-3 d-1 (227 mg m-3 d-1) during late summer 1978 (August-September). Although most stations were relatively close inshore, values were not substantially different (Harrison et al 1982).
+
+In a study of the polar night, the authors present a graphic (Figure 2C) with integrated chla biomass in the surface layer over three years (2017-19). The maximum and minimum chla levels can be approximated from the figure: levels peak at about 100 mgChla m-2 in September to close to 0 in January (Randelhoff et al 2020).  
+
+
+```{r}
+#################################################################################################
+# AMUNDSEN
+#################################################################################################
+
+## Chl data from the Amundsen - open water measurements
+
+dataChl_AB<-read_excel("Chl_AB.xlsx",sheet=1)%>%
+  janitor::clean_names()%>%
+  rename(type=water_or_ice, depth=target_depth_m, chla=chla_ug_l , phaeo=phaeo_ug_l)%>%
+  select(station,date, type, depth, chla, phaeo)%>%
+  filter(type=="Water",chla!="NA") #chla of phytoplankton from open water measurements in ugChla L-1
+  
+dataChl_AB$depth<-as.numeric(dataChl_AB$depth) #convert depth to numeric
+
+##calculation of mean concentration of chla in the euphotic zone. Used for mesozooplankton production
+Chl_AB<-filter(dataChl_AB,depth<=50)%>%
+        group_by(station)%>%
+        summarise(Mean_chl=mean(chla))
+
+Station_group <- read.csv("Station_group.csv") #load station file to see which stations are in east Baffin (lw) and west Baffin (up) - I am interested in west Baffin
+Chl_AB    <- inner_join(Station_group, Chl_AB) #join to the dataset for euphotic zone
+
+res_Chl_AB <- group_by(Chl_AB ,class)%>%
+              summarise(Mean_Chla=mean(Mean_chl),STD=sd(Mean_chl)) #mean chla in the euphotic zone in the east (lw - Greenland) and west (up - Canadian) Baffin Bay in ugChla L-1
+
+#################################################################################################
+
+dataChl_AB$chla<-dataChl_AB$chla*1000 # to have chla concentrations in ug Chla m-3
+
+euz <- read.csv("depth_euz.csv")%>%
+  rename(station = Station) #file containing the depth of the euphotic zone in each station
+
+
+#Creation of the big data.frame containing chl, euz for the calculation of chl integrated on the whole water column
+data<-inner_join(dataChl_AB,euz)
+
+
+Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+
+dfChl_AB     <- group_by(data, station)
+Chl_AB_euz   <- summarise(dfChl_AB, Chl = Pint(chla, depth, euz_dep)) #integration of chla in the euphotic zone 
+
+res_ChlAB_euz  <-c(mean(Chl_AB_euz$Chl),quantile(Chl_AB_euz $Chl,probs=0.95))
+
+##import class of station to distinguish east and west stations
+
+Chl_AB    <- inner_join(Station_group, Chl_AB_euz)
+
+res_Chl_AB <- group_by(Chl_AB ,class)%>%
+              summarise(Mean_chl=mean(Chl),sdt=sd(Chl),Q_5=quantile(Chl,probs=0.05),Q_95=quantile(Chl,probs=0.95),
+                        Min_chl = min(Chl), Max_chl = max(Chl)) # I think this is in ug chla m-2
+
+
+
+```
+
+The GreenEdge project on board the Amundsen probably did not catch the whole phytoplankton bloom. On the east side of Baffin Bay, the bloom was caught in the end while on the west side it was caught in the beginning, but not measured until the end. And as a result phytoplankton biomass and production might be underestimated.
+
+
+Conversions
+
+```{r}
+
+biomass_phy_chla <- 15907.94/1000 #ug chla m-2 to mg chla m-2
+
+# Convert phytoplankton weight based on Chla (based on carbon:chla of 53), gC to gWW and to ton ww km-2 year-1
+
+biomass_phytoplankton <- ((biomass_phy_chla*53*0.001)*9)/4
+biomass_phytoplankton #this value seems low it is likely showing the end of the bloom whereas in stations in the east side of Baffin Bay they caught the beginning of the bloom
+
+# I will average results for both sides and use the max and min (for all stations) as boundaries
+
+biomass_phytoplankton2 <- ((15907.94+46356.68)/2/1000*53*0.001*9) #ug chla m-2 to ton ww km-2
+biomass_phytoplankton2_min <- (2873.24/1000*53*0.001*9) #ug chla m-2 to ton ww km-2
+biomass_phytoplankton2_max <- (108659.14/1000*53*0.001*9) #ug chla m-2 to ton ww km-2
+
+
+biomass_phytoplankton2_year <- ((15907.94+46356.68)/2/1000*53*0.001*9)/4 #ug chla m-2 to ton ww km-2 per year
+biomass_phytoplankton2_min_year <- (2873.24/1000*53*0.001*9)/4 #ug chla m-2 to ton ww km-2
+biomass_phytoplankton2_max_year <- (108659.14/1000*53*0.001*9)/4 #ug chla m-2 to ton ww km-2
+
+
+```
+
+
+**P/B**: 
+
+
+```{r}
+
+#################################################################################################
+# Amundsen
+#################################################################################################
+
+dataPP_AB  <- read_csv("PP_AB.csv") %>%
+  select(Station, Date, Depth, POC_Mean_umol_L, PP_mean_ugC_L_day) # load biomass of particulate organic matter (POC) in umolC L-1 and primary production (PP) of phytoplankton in open water in ugC L-1 day-1
+
+
+dataPP_AB$PP<-dataPP_AB$PP_mean_ugC_L_day*1000# to have PP in ugC.m-3.d-1
+dataPP_AB$POC<-dataPP_AB$POC_Mean_umol_L*1000*12*10^-6 # to have POC in gC.m-3
+
+##extract max depth, that will serve as reference for the depth of euphotic zone
+euzPP<- group_by(dataPP_AB, Station)%>%
+  summarise(euz=max(Depth))
+
+
+Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+dfPP_AB <-inner_join(dataPP_AB,euzPP)%>%
+      group_by( Station )
+
+PP_AB    <- summarise(dfPP_AB, PP=Pint(PP,Depth)) # PP per station in ugC.m-2.d-1
+POC_AB_euz   <- summarise(dfPP_AB, POC=Pint(POC,Depth)) # POC biomass per station in gC m-2
+
+Mean_POC_euz <-mean(POC_AB_euz$POC) # Average POC biomass at the euphotic zone in gC m-2
+
+
+##import class of station to distinguish east and west stations
+Station_group <- read.csv("Station_group.csv")%>%
+  rename(Station=station)
+
+
+PP_AB<-inner_join(Station_group, PP_AB) 
+
+  
+res_PP_AB <-group_by(PP_AB,class)%>%
+            summarise(Mean_month_PP=mean(PP)*30,STD=sd(PP),MIN=min(PP)*30,MAX=max(PP)*30,Med=median(PP)*30,Q_5=quantile(PP,probs=0.05)*30,Q_95=quantile(PP,probs=0.95)*30) # phytoplankton primary production in east (lw) and west (up) Baffin Bay in ugC.m-2.month-1
+
+res_PP_AB 
+
+#################################################################################################
+# ICE-CAMP
+#################################################################################################
+
+# Phytoplankton primary production from ice-camp
+
+dataPP_IC  <- read_csv("PP_IC.csv") %>%
+                  select(Date, Depth, POC_umolC_L, PP_ugC_L_day) #biomass of particulate organic matter (POC) in umolC L-1 and primary production (PP) of phytoplankton under the ice in ugC L-1 day-1
+
+dataPP_IC$PP<-dataPP_IC$PP_ugC_L_day*1000 # to have PP in ugC.m-3.d-1
+dataPP_IC$POC<-dataPP_IC$POC_umolC_L*1000*12*10^-6 # to have gC.m-3
+dataPP_IC$Date<-as.Date(dataPP_IC$Date)
+dataPP_IC<-filter(dataPP_IC,PP!="NA",Date>="2016-06-09", Depth!="ice")
+dataPP_IC$Depth<-as.numeric(dataPP_IC$Depth) 
+
+## define the depth of the euphotic zone as the depth where the PP occurs is minimal.
+depth<-group_by(dataPP_IC, Date) %>%
+       summarise(euz=dataPP_IC$Depth[which.min(abs(dataPP_IC$PP-0))])
+
+  Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+
+load("EUZ_IC.csv") #load euphotic zone for the ice camp
+
+EUZ_IC <- rename(EUZ_IC, c(Date = date))
+
+dfPP<-inner_join(dataPP_IC,EUZ_IC)%>%
+      group_by( Date )
+
+
+dfPP     <- group_by( dataPP_IC, Date )
+
+PP_IC    <- summarise(dfPP, PP=Pint(PP,Depth)) #PP of phytoplankton under ice per day in ugC.m-2
+
+POC_IC   <- summarise(dfPP, POC=Pint(POC,Depth)) # POC per day in gC m-2
+
+moy_POC=mean(POC_IC$POC)
+
+
+## Calculation of monthly integrated PP
+Dlim  <- as.Date("2016-07-09")
+
+Pday <- function(X, D) {
+  
+  N    <- length(X)
+  
+  dD <- c( 1, as.numeric(diff(D[1:N])))
+  
+  dX <- c( X[1], ( X[1:(N-1)] + X[2:N] ) * 0.5 )
+  
+  Xint <- sum( dX * dD )
+  
+  if (Dlim-D[N]>0){
+    Xint<-Xint+(X[N]* as.numeric(Dlim-D[N]))
+  }
+  
+  
+  return(Xint)
+}
+
+PP_IC$Date <- as.Date(PP_IC$Date)
+
+res_PP_IC<- Pday(PP_IC$PP, PP_IC$Date) #PP of phytoplankton under ice in ugC m-2 month-1
+
+
+```
+
+
+```{r}
+#Convert ugC/m2/month to tonww/km2/month 
+
+production_phytoplankton_Amundsen <- ((10669809+14210059/2)*1e-6)*9 #average production per month in west and east to be consitent with biomass (not including ice camp)
+production_phytoplankton_Amundsen_min <- 1539450*1e-6*9
+production_phytoplankton_Amundsen_max <- 37710000*1e-6*9
+
+
+PB_phytoplankton_Amundsen <- (production_phytoplankton_Amundsen*4)/biomass_phytoplankton2_year #PB per year
+
+
+#From ice camp
+production_phytoplankton_IC <- (res_PP_IC*1e-6)*9*4 # in tonww/km2/year - I ended up not using the PP under ice in final PP of phytoplankton
+
+
+```
+
+
+
+## Detritus
+
+**Biomass**: 
+
+```{r}
+# From GreenEdge project, estimated POC from the Amundsen and ice camp; POC from datasets for both Amundsen (Mean_POC_euz) and ice camp (moy_POC) included all chla and were converted to gC/m2. Need first to subtract the biomass of sea ice algae and the biomass of phytoplankton which were converted to ugC/m2 above. Then convert to tonww/km2
+
+biomass_POC <- ((Mean_POC_euz-((15907.94+46356.68)/2*1e-6)) + (moy_POC-(111151.604*1e-6)))/2 *9
+
+
+```
+
+
+Alternatively, the detritus biomass can be estimated using an empirical relationship derived by Pauly et al. (1993). It relates detritus biomass to primary productivity and euphotic depth. 
+
+$$log_{10}(D) = -2.41 + 0.954*log_{10}(PP) + 0.863*log_{10}(E)$$ 
+
+ $D$ = detritus standing stock ($gC·m^{-2}$) 
+ $PP$ = primary productivity ($gCm^{-2} year^{-1}$) 
+ $E$ = euphotic depth (m) 
+
+
+Detritus biomass was calculated assuming phytoplankton primary production as 73.7 gC·m-2.y-1 (Arrigo and van Dijken 2011), and euphotic depth as 35 meters (Harrison et al. 1982). [2]
+
+
+```{r}
+
+
+detritus <- function(PP) {
+  D_biomass = (10^(-2.41 + 0.954*log10(PP) + 0.863*log10(25)))
+  return(D_biomass)
+}
+
+
+```
+
+
+## Bacteria
+
+**Biomass**: 
+
+
+```{r}
+dataAB<-read_csv("AB_AB-IC.csv")%>%
+  select(operation, year, date, station, ctd, depth_m, sample_type, Bact_mL)%>%
+  rename(AB=Bact_mL, depth=depth_m, Station = station) #load bacteria per ml 
+
+
+dataAB$AB<-dataAB$AB*10^6 #mL to m-3
+dataAB$date<-as.Date(dataAB$date)
+
+#################################################################################################
+# Amundsen
+#################################################################################################
+
+dataAB_AB<-filter(dataAB, operation == "Amundsen", sample_type=="water") ## data.frame ready for use
+
+euz <- read.csv("depth_euz.csv")
+
+
+data<-right_join(dataAB_AB,euz)%>%
+      filter(Station!="NA", Station!="G309", Station!="G604.5") #join the euphotic zone and exclude stations for which there were no measurements
+      
+      
+
+Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+dfAB <- group_by(data, Station, ctd )
+
+AB_AB  <- summarise(dfAB, AB = Pint(AB, depth, 50))
+
+Station_group <- read.csv("Station_group.csv")%>%
+  rename(Station = station)
+
+
+AB<-inner_join(Station_group, AB_AB)%>%
+     group_by(class)
+
+res_AB <-summarise(AB,Mean_AB=mean(AB),Q_95=quantile(AB,probs=0.95), Q_5=quantile(AB,probs=0.05)) #mean abundance of bacteria in open water in cell of bacteria m-2          
+
+
+#################################################################################################
+# ICE-CAMP
+#################################################################################################
+
+dataAB_IC<-filter(dataAB, operation == "Ice camp", sample_type=="water", AB!="NA")%>%## data.frame ready for use
+           select(-Station, -ctd)
+
+dataAB_IC_2015<-filter(dataAB_IC,year=="2015",date>="2015-06-09")
+dataAB_IC_2016<-filter(dataAB_IC,year=="2016",date>="2016-06-09")
+
+dataAB_IC_tidy<-bind_rows(dataAB_IC_2015,dataAB_IC_2016)
+  
+
+Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+
+dfAB <- group_by(dataAB_IC_tidy, year, date) #sort by date
+
+AB  <- summarise(dfAB, AB = Pint(AB, depth)) # integrates bacterial abundance for each day of 2015 measurements
+
+
+res_AB_IC<-group_by(AB,year)%>%
+           summarise(Mean_AB=mean(AB),Q_95=quantile(AB,probs=0.95), Q_5=quantile(AB,probs=0.05))
+
+#fusion AB/IC
+
+AB_2016<-filter(AB, year=="2016")
+         
+AB_AB<-inner_join(Station_group, AB_AB)%>%
+       filter(class=="up")
+
+AB_full_W<-c(AB_2016$AB,AB_AB$AB) #values for west Baffin Bay Ice camp in 2016 added to Amundsen values (open water)
+Q_5<-quantile(AB_full_W,probs=0.05)
+Q_95<-quantile(AB_full_W,probs=0.95)
+Moy<-mean(AB_full_W) # average values of bacteria abundance (I am assuming this is cells per m-2 per month) in 2016 (Amundsen and Ice camp)
+
+
+```
+
+Conversions
+
+Saint-Béat et al considered the mean carbon content of 8.5 fg C per cell (1fgC = 1e-15gC)
+- Hoover used a conversion of 1gC = 9gww
+- In the North Sea report they considered the conversion for protozoa of 1 gww = 0.165 gC (DeLaca 1985)
+
+```{r}
+#Convert n cells/m2/month to tonww/m2/year
+
+biomass_bacteria <- (8.5e-15*3.033645e+13/0.165)*(1.10231e-6/1e-6)	 
+# I am assuming the biomass of bacteria to be constant throughout the year
+
+```
+
+
+**P/B and Q/B**: 
+
+
+```{r}
+
+
+#################################################################################################
+# AMUNDSEN
+#################################################################################################
+
+## BP data
+
+dataBP_AB<-read_csv("BP_AB.csv")%>%
+        select(Station,Date, Depth, BP_ugC_L_d)
+
+dataBP_AB$BP<-dataBP_AB$BP_ugC_L_d*1000 # to have BP in ugC.m-3.d-1
+dataBP_AB$Date<-as.Date(dataBP_AB$Date)
+
+
+#import data on depth euphotic zone
+euz <- read.csv("depth_euz.csv")
+
+#Creation of the big data.frame containing BP, euz for the calculation of BP integrated on the whole water column
+data<-inner_join(dataBP_AB,euz)
+
+Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+dfBP_AB <- group_by(data, Station,25)
+
+BP_AB   <- summarise(dfBP_AB, BP = Pint(BP, Depth)) # bacteria production per station in ugC.m-3.d-1
+
+
+##import class of station to distinguish east and west stations
+Station_group <- read.csv("Station_group.csv") %>%
+  rename(Station = station)
+
+BP_AB <- inner_join(Station_group, BP_AB) 
+
+# fusion AB/IC
+BP_AB_W<-filter(BP_AB, class=="up")
+BP_AB_W$BP<-  BP_AB_W$BP*30 
+BP_AB_W<-BP_AB_W$BP
+BP_AB_W<-c(BP_AB_W,238445.24)
+Q_5<-quantile(BP_AB_W,probs=0.05)
+Q_95<-quantile(BP_AB_W,probs=0.95)
+
+BP_AB_sort<-filter(BP_AB, Station!="G300") 
+          
+res_PB_AB <- group_by(BP_AB ,class)%>%
+             summarise(Mean_month_PB=mean(BP)*30,STD=sd(BP),MIN=min(BP)*30,MAX=max(BP)*30,Med=median(BP)*30,Q_5=quantile(BP,probs=0.05)*30,Q_95=quantile(BP,probs=0.95)*30) #bacterial production from the Amundsen in ugC m-2 month-1 in the west (up) and east (lw) side of baffin Bay
+
+res_PB_AB_sort <- group_by(BP_AB_sort ,class)%>%
+                  summarise(Mean_month_PB=mean(BP)*30,Q_5=quantile(BP,probs=0.05)*30,Q_95=quantile(BP,probs=0.95)*30)
+
+
+#################################################################################################
+# ICE-CAMP
+#################################################################################################
+
+dataBP_IC<-read.csv("BP_IC.csv")%>%
+  select(Date, Environment, Av_ugC_L_d) %>%
+  rename(depth = Environment) %>%
+  mutate(BP = Av_ugC_L_d*1000) %>%
+  filter(depth!="Under-Ice", depth!="UI") %>%
+  mutate(Date = as.Date(Date)) %>%
+  mutate_at("depth", str_replace, "m", "") %>%
+  mutate(depth = as.numeric(depth))
+  
+
+dataBP_IC<-filter(dataBP_IC, Date >="2016-06-09")
+
+Pint <- function(X, Z, Zlim=max(Z)) {
+  
+  N    <- length(X)
+  Nlim <- which.min(abs(Z-Zlim))
+  
+  dZ <- c( Z[1], diff(Z[1:Nlim]) )
+  
+  dX <- c( X[1], ( X[1:(Nlim-1)] + X[2:Nlim] ) * 0.5 )
+  
+  Xint <- sum( dX * dZ )
+  
+  return(Xint)
+}
+
+dfBP <- group_by(dataBP_IC, Date )
+
+BP_IC    <- summarise(dfBP, BP = Pint(BP, depth)) #BP in ugC.m-2.d-1
+
+
+Dlim  <- as.Date("2016-07-09")
+ 
+Pday <- function(X, D) {
+   
+   N    <- length(X)
+   
+   dD <- c( 1, as.numeric( diff(D[1:N])))
+   
+   dX <- c( X[1], ( X[1:(N-1)] + X[2:N] ) * 0.5 )
+   
+   Xint <- sum( dX * dD )
+   
+  if (Dlim-D[N]>0){
+   Xint<-Xint+(X[N]* as.numeric(Dlim-D[N]))
+ }
+   
+   
+   return(Xint)
+ }
+
+BP_IC$Date <- as.Date(BP_IC$Date)
+
+res_PB_IC<-Pday(BP_IC$BP,BP_IC$Date) #BP in ugC.m-2.month-1
+ 
+###
+
+
+```
+
+
+
+Conversions
+
+```{r}
+#Convert ugC/m2/month to tonWW/km2/year
+
+pdct_bacteria <- ((287597.0+res_PB_IC)/2)*1e-6/0.165
+
+PB_bacteria <- pdct_bacteria*12/biomass_bacteria #assuming bacteria produces the whole year
+
+#Calculate Q/B
+
+
+flow<-read.csv("Flows_values.csv") %>%
+      select(flows,WBB)%>%
+      separate(flows,into=c("from","to"),sep="->",remove=T)
+
+conso<-group_by(flow, to)%>%
+       summarise(conso=sum(WBB)) %>%
+      mutate(Group_abb = to)
+
+# conversion from gC/sqm/month to tonWw/sqkm/month
+
+conso_bacteria <- 4.031/0.165
+
+# calculate P/B and Q/B 
+
+QB_bacteria <- conso_bacteria*12/biomass_bacteria
+
+```
+
+

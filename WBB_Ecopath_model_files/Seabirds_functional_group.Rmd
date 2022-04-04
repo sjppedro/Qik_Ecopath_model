@@ -1,0 +1,531 @@
+---
+title: "Seabirds-parameters"
+author: "Sara Pedro"
+date: "13/01/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo =FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(png)      
+
+```
+
+
+The full citation corresponding to the literature cited in this file can be found in the Ecopath technical report for this project.
+
+
+## Functional Groups
+
+Seabirds: 
+
+* Thick-billed murre *Uria lomvia* - Inuit eat their eggs
+* Northern fulmar *Fulmarus glacialis*
+* Black-legged kittiwake *Rissa tridactyla*
+* White gulls (Glaucus gull *Larus hyperboreus* and Iceland Gull *Larus glaucoides*) 
+
+Others that are or might be present, although not much information on abundance or habitat use in the area:
+
+* Little auk (or Dovekie) *Alle alle*
+* Red phalarope	*Phalaropus fulicarius*
+* Common eider *Somateria mollissima*
+* Black guillemots *Cepphus grylle*
+* Ivory gull *Pagophila eburnea*
+* Ross's gull *Rhodostethia rosea*
+* Common murre *Uria aalge*
+* King eider *Somateria spectabilis*
+* Long-tailed duck *Clangula hyemalis*
+* Arctic skua *Stercorarius parasitica*
+* Long-tailed duck *Clangula hyemalis*
+* Red-throated loon *Gavia stellata*
+* Sabine's gull *Xema sabini*
+* Arctic tern *Sterna paradisaea*
+
+
+
+For biomass, P/B and Q/B calculations, Hunt et al 2000 has data on body weight for several bird species and Schreiber and Burger 2002 have mortality estimates for seabirds. 
+A lot of this data applied to other models in the Arctic is reported in tables in Aydin et al 2007 in Table B6, B7 and B8, pages 212-214.
+
+
+## Fishing (Hunting) mortality - harvest (/year)
+
+This is calculated based on landings (individuals/year to tones per km2) and biomass (tones per km2). 
+
+Fishing mortality = (landings_ind_year*weight_ton/area)/biomass
+
+
+
+## Production/biomass - P/B (/year)  
+
+Seabird P/B ratios were calculated from survival estimates provided in Schreiber and Burger (2001) or were approximated with mortality rates given in Furness and Monaghan (1987).
+
+
+For seabirds, separate survival rates for adults and sub-adults were used along with the population data to compute a weighted population life expectancy i.e.,
+
+$$life.expectancy = \frac{a}{N} * \frac{-1}{ln (sa)} + \frac{s}{N} * \frac{-1}{ln (ss)}$$
+
+$a$ number of adults, 
+$N$ total population by number
+$sa$ is the survival rate for adults
+$s$ number of sub-adults
+$ss$ sub-adult survival rate
+
+
+$$P/B = ln(survival.rate)$$
+
+
+### Diet matrix (%)
+
+
+In aggregated functional groups, species diet matrices should be aggregated: each percentage in the aggregated diet is a weighted mean (weighted by each species consumption Q) of the respective percentages from the species diets.
+
+
+## Consumption/biomass - Q/B (/year)
+
+The annual Q/B ratio can be estimated by using the daily ration (R), the average weight (W) in grams for each species, and the empirical equation:
+
+$$log R = -0.293 + 0.85 log W(g)$$
+
+
+obtained from Nilsson and Nilsson (1976) in Wada (1996).
+
+
+From Booth's master thesis:
+
+For seabirds, consumption was estimated through the use of metabolic-based equations to predict an active metabolic rate (AMR) from the basal metabolic rate (BMR) and assimilation efficiency (Stevick et al., 2008):
+
+
+$$Consumption (kg) = d*N*aW^b$$
+
+$N$ - number of individuals 
+$W$ - average weight in kilograms 
+$a$ - taxonomic scaling factor
+$b$ - exponent commonly around 0.75 (Strogatz, 2009)
+$d$ - number of days spent within the region
+
+The AMR was then substituted into the equation above (in place of the aWb term) to estimate consumption. For the three species within charadriiformes (gulls and terns), that have a residence time of three months the equations for consumption are:
+
+$$AMR (kj·day^{-1}) = \frac{2.8*BMR}{0.75}$$
+
+$$BMR (kj·day^{-1})= 544.9*W(g)*0.804$$
+
+$W(g)$ is the weight in grams of an individual 
+
+Thus, equation 1 can be used to determine the total consumption in terms of energy required (i.e., kj·day-1) given an estimate of the size of the population, and the days spent within the area. Combining estimates of diet composition for the seabird groups in the Ecopath model with estimates of energy content per gram of diet component the Q/B ratio can be estimated.
+
+For the northern fulmar, a procellariiform, the AMR is estimated from the equation above, but the BMR is estimated from Stevick et al. (2008) as:
+
+$$BMR = 416.3*W(g)*0.726$$
+
+
+Another option is to use the daily energy requirements calculations according to Hunt et al 2000. In this study, they estimated the daily energy requirements of individual birds by using the allometric equation of Birt-Friesen et al. (1989) that predicts energy requirements as a function of body mass:
+
+$$log Y = 3.24 + 0.727*log M$$
+
+Y = daily energy requirements in kj
+M = mass in kg (Birt-Friesen et al., 1989)
+
+I am using this last procedure in my models.
+
+
+## Seabird functional group
+
+Thick-billed murre, black-legged kittiwake, and northern fulmar are the most numerous seabirds in the East coast of Baffin Island. These are also the species for which there is more information available. Little auk is quite numerous in Baffin Bay, even more than the above mentioned species, but their colonies are located in West Greenland and they forage close to that area (M. Mallory, personal communication). 
+There is only one know colony of little auk in east Baffin Island in Home Bay, but this colony is small and there are no good estimates of abundance.
+
+**The most important seabird colonies within the model area are located in Scott Inlet (263 km$^2$), Buchan Gulf (387 km$^2$), Cape Searle and The Minarets. These last two can be considered a large colony - Qaqulluit/Akpait (12 894 km$^2$)**. The colonies have large numbers of thick-billed murres, northern fulmars and black-legged kittiwakes. Other species were also observed in the colonies, mainly black guillemots (some in Scott Inlet and Akpait), white-winged gulls (about 100 pairs in Scott Inlet and some in Akpait) and eithers (25 000 pairs in Buchan Gulf and some in Scott Inlet). Yet, the abundance of these species is mostly dated and/or not known, so I will not include them in the model (Mallory et al 2019).
+
+
+```{r}
+
+# Portion of the model area
+
+area_Qaqulluit <- 12894/81448
+area_Scott <- 263/81448
+area_Buchan <- 387/81448
+
+```
+
+
+Seabirds are present in these colonies from mid-April through October. In the open sea (typically >1km from shore), Arctic marine birds use both benthic and pelagic resources, up to a depth of 200 m (Mallory et al 2019).
+
+
+
+## Seabirds
+
+
+**Weigth**:   
+
+Weight from Hunt et al 2000 Appendix 2.
+
+
+```{r}
+
+weight_TBM <- 0.964
+weight_BLK <- 0.407
+weight_NF <- 0.544
+
+average_weight_seabirds <- (weight_TBM + weight_BLK + weight_NF)/3
+
+```
+
+
+**Abundance**:
+
+*Thick-billed murre*
+
+McLaren 1982 reports abundance data for thick-billed murres, black-legged kittiwakes, northern fulmars and black guillemot in the eastern Lancaster Sound-western Baffin Bay area in 1976, 1978 and 1979.
+
+According to McLaren 1982, abundance of thick-billed murre in the summers of 1978-79 varied from May to June in Nortwest and West Baffin Bay with an average of 2.86 seabirds/km2 offshore, corresponding to an average number of individuals of 170 917 individuals.
+When averaging density of birds in all areas surveyed (offshore, coastal, fast ice edges) the estimate is 16.6 seabirds/km2.
+
+Gaston et al 2012 and Mallory et al 2019 review counts for colonies of Arctic seabirds. Within the model area, thick-billed murres have a large colony in The Minarets of 130 000 pairs, i.e. 260 000 individuals. Considering the area of 12 894 km2, the abundance of thick-billed murres is 20.2 individuals/km2. This area is about 15 % of the model area, so the abundance in the model area is 3.19 individuals/km2.
+
+
+```{r}
+abundance_TBM <- 260000/12894*area_Qaqulluit
+
+
+```
+
+
+
+*Black-legged kittiwake*
+
+According to McLaren 1982, abundance of black-legged kittiwake in the summers of 1978-79 varied from May to June in Nortwest and West Baffin Bay with an average of 0.33 seabirds/km2 offshore, corresponding to an average number of individuals of 12 905 individuals.
+When averaging density of birds in all areas surveyed (offshore, coastal, fast ice edges) the estimate is 14.7 seabirds/km2.
+
+Gaston et al 2012 and Mallory et al 2019 review counts for colonies of Arctic seabirds. Within the model area, black-legged kittiwakes have a colony in The Minarets of 1900 pairs, i.e. 3800 individuals. Considering the area of 12 894 km2, the abundance of this seabird is 20.2 individuals/km2. This area is about 15 % of the model area, so the abundance in the model area is 0.05 individuals/km2.
+
+
+```{r}
+abundance_BLK <- 3800/12894*area_Qaqulluit
+
+
+```
+
+
+*Northern fulmar*
+
+According to McLaren 1982, abundance of northern fulmar in the summers of 1978-79 varied from May to June in Northwest and West Baffin Bay with an average of 0.40 seabirds/km2 offshore, corresponding to an average number of individuals of 19 952 individuals.
+When averaging density of birds in all areas surveyed (offshore, coastal, fast ice edges) the estimate is 7.13 seabirds/km2.
+
+Gaston et al 2012 and Mallory et al 2019 review counts for colonies of Arctic seabirds. Within the model area, northern fulmars have colonies in Scott Inlet (10 000 pairs), Buchan Gulf (10 000 pairs), Cape Searle (35 000 pairs) and The Minarets (15 000 pairs), i.e. 20 000, 20 000, 50 000 individuals for Scott Inlet, Buchan Gulf and Qaqulluit/Akpait, respectively. The abundance of this seabird is 0.246 individuals/km2 in Scott Inlet and Buchan Gulf and 0.614 in Qaqulluit. Taking into account the % of model area, the abundance in the model area is 1.11 individuals/km2.
+
+
+```{r}
+abundance_NF1 <- 20000/263*area_Scott
+abundance_NF2 <- 20000/387*area_Buchan
+abundance_NF3 <- 50000/12894*area_Qaqulluit
+
+abundance_NF <- abundance_NF1+abundance_NF2+abundance_NF3
+
+
+```
+
+
+
+**Biomass**: 
+
+
+Calculated based on (weight_kg/1000)*abundance, and considering the seabirds are in the model area only in summer months
+
+
+```{r}
+
+Biomass_TBM <- (weight_TBM/1000*abundance_TBM) 
+Biomass_TBM
+
+
+Biomass_BLK <- (weight_BLK/1000*abundance_BLK) 
+Biomass_BLK
+
+
+Biomass_NF <- (weight_NF/1000*abundance_NF) 
+Biomass_NF
+
+
+Biomass_seabirds <- Biomass_TBM  + Biomass_BLK  + Biomass_NF 
+Biomass_seabirds
+
+Biomass_seabirds_year <- Biomass_seabirds/4
+Biomass_seabirds_year
+
+```
+
+
+
+### Thick-billed murres
+
+Hunting estimates in Frederiksen et al 2016, taken from National Wildlife Research Centre, Canadian Wildlife Service.
+
+The limited information available suggests that breeding-age birds make up approximately one third of the murre hunting bag in Greenland (Falk and Durinck, 1992; Frich, 1997); with a hunting bag of ~65,000 birds (Fig. 5) this corresponds to 2–3% annual mortality of the ~800,000 breeding-age murres estimated to winter offWest Greenland.
+
+Atlantic Canada is often regarded as the area with the greatest variety of anthropogenic threats to wintering murres. Numbers of murres reported shot have been high, although they have declined substantially in recent years (Frederiksen et al 2016). Mortality sources in Atlantic Canada are largely constrained to the southern part of the murre winter range, so populations wintering off Labrador and Baffin Island would not be affected, while those wintering around Newfoundland may be disproportionately affected (McFarlane Tranquilla et al., 2013).
+
+According to figure 5 in Frederiksen et al (2016) reported shots of murres in Canada are around 40-70000 per year in the past 8 years. The authors report a mortality due to hunting of 2-3 % in Greenland. For my models, I will consider the lower end hunting mortality in Canada, i.e. 2 % per year.
+
+
+**Harvest mortality**: 
+
+The thick-billed murre is the most commonly harvested seabird in the Canadian North.
+
+Fishing mortality = (landings_ind_year*weight_ton/area)/biomass
+
+```{r}
+
+hunting_TBM <- 0.02
+
+harvest_mortality_TBM <- ((0.13*15000)*(weight_TBM/1000)/12894*area_Qaqulluit)/Biomass_TBM
+harvest_TBM <- (0.13*15000)*(weight_TBM/1000)/12894*area_Qaqulluit
+
+```
+
+
+
+**P/B**: 
+
+
+*Thick-billed murres*: In Booth (2012) the author applied an adult survival rate of 0.89 and a survival rate to age 3 of 0.52 for birds from a breeding site at Coats Island, Hudson Bay to juveniles and chicks of TBM, to establish the life expectancy (based on equation 1) for the population and estimated a P/B ratio of 0.3296 year-1.
+
+In Schreiber et al (2001) the annual survival rate reported is 0.88-0.90, with a maximum age of 29 years.
+
+In Aydin et al 2007 the P/B was estimated as 0.169488 for murres, based on a survival rate of 0.75-0.95 (order level). Seabird P/B ratios were calculated from survival estimates provided in Schreiber et al (2001).
+
+I averaged the two P/B estimates in previous studies for my models.
+
+
+*Black-legged kittiwake*: In Booth (2012) an adult survival rate of 0.926 was used from a colony in Alaska  with a juvenile survival rate 0f 0.541 from a colony in Norway to estimate life expectancy (equation 2) and the P/B ratio of 0.2261·year-1.
+
+In Schreiber et al (2001), the adult survival presented in Table 5.2 is 0.926 for BLK in Middleton Islands, Alaska (Hatch et al 1993), 0.925 for Shoup Bay, Alaska (Golet et al 1998) and 0.930 for St. George, bering Sea (Dragoo and Dragoo 1996). The annual survival rate is 0.88-0.93, with a maximum age of 18 years.
+
+In Aydin et al 2007 the P/B was estimated as 0.075804 for kittiwakes, based on a survival rate of 0.93. Seabird P/B ratios were calculated from survival estimates provided in Schreiber et al (2001). 
+
+I averaged the previous P/B estimates in previous studies for my models.
+
+
+
+*Northern fulmar*: In Booth (2012), the P/B ratio of 0.1908·year-1 was based on an adult survival rate of 0.969 and a survival rate of 0.541 for juveniles for the Pacific population.
+
+In Schreiber et al (2001) the annual survival rate reported is 0.94-0.97, with a maximum age of 31 years.
+
+In Aydin et al 2007 the P/B was estimated as 0.055, based on annual mortality rate of 0.055 for fulmars. Seabird P/B ratios were approximated with mortality rates given in Furness and Monaghan (1987).
+
+For my models I will use a P/B of 0.055 based Aydin et al 2007, also because this value is very similar to that obtained by Booth 2012.
+
+
+
+```{r}
+
+mortality_TBM <- (0.169488 + 0.3296)/2
+PB_TBM <-  harvest_mortality_TBM + mortality_TBM
+PB_TBM
+
+
+mortality_BLK <- (0.2261 + 0.075804)/2  
+PB_BLK <- mortality_BLK
+PB_BLK
+
+
+mortality_NF <- (0.055 + 0.1908)/2 
+PB_NF <- mortality_NF
+PB_NF
+
+
+
+PB_Seabirds <- PB_TBM*(Biomass_TBM/Biomass_seabirds) + PB_BLK*(Biomass_BLK/Biomass_seabirds) + PB_NF*(Biomass_NF/Biomass_seabirds)
+
+PB_Seabirds
+
+```
+
+
+
+**Diet composition**: 16.52 % Omnivorous zooplankton; 2 % Calanus; 13.23 % Carnivorous zooplankton; 10.05 % Arctic/polar cod; 14.74 % small pelagic fish; 2.64 % small demersal fish; 3.59 % Sculpin/eelpouts; 15.00 % Shrimp; 2 % Cephalopods; 20.23 % Euphausiids/Mysids (Import - I will consider that they are feeding on this more offshore)
+
+More detailed:
+
+33.04 % amphipods (Omnivorous and carnivorous); 0.35 % copepods (Calanus); 0.04 % *Limacina limacina* (Carnivorous); 10.05 % *Boreogadus saida*; 3.21 % pelagic lanternfish; 2.64 % snailfish; 3.59 % sculpin; 20.23 % mysids (Euphausiids/Mysids); 15.00 % shrimp; 0.32 % Cephalopoda; 11.53 % other fish 
+
+
+
+*Thick-billed murre*: 14.29 % Lysianassidae; 0.38 % Gammaridae; 24.14 % Ischyroceridae;	0.19 % Oedicerotidae; 0.19 % Pontongeneidae; 24.33 % Mysidacea; 0.19 % Harpacticoida; 0.38 % Decapoda; 17.57 % Cumacea; 0.38 % Cephalopoda; 0.57 % Gadidae; 3.83 % Cottidae; 13.52 % other fish
+
+Diet values in % wet weight only available for seabirds in Greenland, where preferred prey is capelin. There is data on % occurrence for North Water Polynya in spring, summer and fall (1998-1999), in Minarets, Davis Strait in summer (1985) and in Cape Hay, Bylot Island in summer (1976-1979). 
+
+According to Gaston et al 1993, "the relative contribution of invertebrates was higher in the High adult murre diets between the marine zones. The relative contribution of invertebrates was higher in the High Arctic than in the Low Arctic, and the relative contribution of fish was lower. The number of species taken increased from the High Arctic to the Low Arctic." Diet of adults and subadults not significantly different in this study.
+
+The authors also point out that although invertebrates make up most of the diet in frequency of occurrence, the biomass of fish may contribute more to the diet. The composition of diet estimated in dry weight suggests that *Boreogadus saida* accounted 72 % of diet biomass in the High Arctic and 28 % was invertebrates.
+
+I will consider the diet in Minarets. Yet, this diet may be misrepresenting the contribution of fish in terms of biomass, which is likely much higher.
+
+A study by LeBlanc et al 2019 looked at the co-distribution of Arctic cod and its seabird predators near Qik (part of expeditions of GreenEdge - June-July 2016). They report relative frequency % of fish species ingested by seabirds based on stomach contents. In this region, thick-billed murre feed much more extensively on Arctic cod than other fish: 94.4 % *Boreogadus saida*; 3.3 % *Liparis atlanticus*; 1.1 % *Liparis fabricii*; 1.1 % *Triglops* sp. Yet, it seems like in this study they did not quantify other prey other than fish.
+
+
+*Black-legged kittiwake*: 42.5 % *Themisto libellula*; 2.7 % *Metridia longa*; 7.6 % *Limacina limacina*; 28.2 % *Boreogadus saida*; 18.9 % other.
+
+
+Study by Karnovsky et al 2008 has diet for thick-billed murres, little auk and black-legged kittiwakes in the North Water Polynya in summer, spring and fall. The diets vary throughout the season. Kittiwakes mainly consumed *Boreogadus saida* and *Themisto libellula*. In the fall they also consumed the pteropod *Limacina limacina*. The diets in this study are not reported on weight %, just in % occurrence in stomachs (not adding to 100%) and % total number of prey taxa. Data is reported in graphical form, no exact values. I averaged the % total number of prey accross seasons.  
+
+A study by LeBlanc et al 2019 looked at the co-distribution of Arctic cod and its seabird predators near Qik (part of expeditions of GreenEdge - June-July 2016). They report relative frequency % of fish species ingested by seabirds based on stomach contents. In this region, black-legged kittiwake feed much more extensively on Arctic cod: 96.4 % *Boreogadus saida*; 3.6 % *Benthosema glaciale*. Yet, it seems like in this study they did not quantify other prey other than fish.
+
+
+
+*Northern fulmar*: 57.6 % *Boreogadus saida*; 13.84 % *Benthosema glaciale*; 8.03 % *Liparis gibbus*; 5.81 % *Lampanyctus macdonaldi*; 4.65 % *Liparis atlanticus*; 2.32 % *Liparis fabricii*; 2.32 % *Gymnocanthus tricuspis*; 1.16 % *Ammodytes* sp.; 1.16 % *Careproctus reinhardti*; 0.8 % Hyperiidae; 0.6 % Lysianassidae; 0.1 % Calliopiidae; 0.1 % Mysidacea; 1.1 % Copepoda; 0.5 % Decapoda
+
+Stomach contents of northern fulmar offshore landfast ice edge from Pond Inlet in 1979 in dry weight %. Although older, this is the diet I am using for the models since it has % dry weight.This study also has energy content of food items (Bradstreet and Cross 1982). It is important to take into account that fulmars feed more on other fish near Qik, according to LeBlanc et al 2019. 
+
+96.9 % gadidae
+0.8 % Hyperiidae
+0.6 % Lysianassidae
+0.1 % Calliopiidae
+0.1 % Mysidacea
+1.1 % Copepoda
+0.5 % Decapoda
+
+A study by LeBlanc et al 2019 looked at the co-distribution of Arctic cod and its seabird predators near Qik (part of expeditions of GreenEdge - June-July 2016). They report relative frequency % of fish species ingested by seabirds based on stomach contents. In this region, northern fulmar feed much more extensively on Arctic cod than other fish: 59.5 % *Boreogadus saida*; 14.3 % *Benthosema glaciale*; 8.3 % *Liparis gibbus*; 6.0 % *Lampanyctus macdonaldi*; 4.8 % *Liparis atlanticus*; 2.4 % *Liparis fabricii*; 2.4 % *Gymnocanthus tricuspis*; 1.2 % *Ammodytes* sp.; 1.2 % *Careproctus reinhardti*. Yet, it seems like in this study they did not quantify other prey other than fish.
+
+
+For my models I adjust the diet fish % in LeBlanc, M, et al. (2019) within the 96.9 % gadidae in Pond Inlet.
+
+
+Diet composition weighed for the functional group was based on biomass contribution of each seabird species to the functional group: 
+
+```{r}
+
+Biomass_TBM/Biomass_seabirds
+Biomass_NF/Biomass_seabirds
+Biomass_BLK/Biomass_seabirds
+
+```
+
+
+
+**Q/B**:
+
+Kittiwakes
+
+Gabrielsen et al 1987 (The Condor) estimated a field metabolic rate of 596 +/- 179 kJ/day for breeding black-legged kittiwakes in Svalbard. For foraging birds, the FMR averaged 992 +/- 273 kJ/day. 
+Fyhn et at 2001 (Physiological and Biochemical Zoology) calculated FMR in kittiwakes also in Svalbard during chick-rearing period. Mean FMR of kittiwakes during the chick-rearing period was 27.0 +/- 0.9 (SE) W/kg. This can be translated into 753 kJ/day in the first part of the chick-rearing period and 865 kJ/day in the second part (in Moe et al 2002 Journal of Avian Zoology). 
+Gabrielsen and Mehlum 2002 reported a mean pre-incubation FMR-value of 772 kJ/day for Kittiwakes in the same colony in Svalbard as Fyhn et al 2001.
+Welcker et al 2013 (Plos One) estimated FMR to be 12.48 +/- 0.52 (SE) Watt in males and 7.92 +/- 0.35 Watt in females. Kittiwakes were chick-rearing in Svalbard.
+Elliot et al 2013 (Biology Letters) estimated an average daily energy cost of 788 +/- 127 kJ/day for kittiwakes in Alaska.
+Welcker et al 2010 (Journal of Animal Ecology) estimated the mean rate of energy expenditure to be 881.7 ± 19.8 kJ/day in kittiwakes from Svalbard during the mid-chick-rearing stage.
+
+
+Thick-billed murres
+
+Elliot et al 2013 (Biology Letters) estimated an average daily energy cost of 2036 +/- 552 kJ/day for murres in Hudson Bay.
+
+
+Northern fulmars
+
+Gabrielsen, Mehlum, and Karlsen (1988) and Bryant and Furness (1995) reported a basal metabolic rate (BMR) for northern fulmars of 300–312 kJ/d and a field metabolic rate (FMR) averaging 1444 kJ·d‒1 (Furness & Bryant, 1996) (in Mallory and Forbes 2013 Ecoscience). 
+
+```{r}
+#Energy requirements of each seabird in kJ/year 
+
+
+E_TBM_kJ_year <- (10^(3.24 + 0.727*log10(weight_TBM)))*365
+E_BLK_kJ_year <- (10^(3.24 + 0.727*log10(weight_BLK)))*365
+E_NF_kJ_year <- (10^(3.24 + 0.727*log10(weight_NF)))*365
+
+E_seabird_kJ_year <- E_TBM_kJ_year*(Biomass_TBM/Biomass_seabirds) + E_BLK_kJ_year*(Biomass_BLK/Biomass_seabirds) + E_NF_kJ_year*(Biomass_NF/Biomass_seabirds)
+   
+
+
+#Convert kJ/year to ton/year based on diet composition and energetics of diet
+
+#Diet composition is 16.52 % Omnivorous zooplankton; 2 % Calanus; 13.23 % Carnivorous zooplankton; 10.05 % Arctic/polar cod; 14.74 % Other marine fish; 2.64 % Other demersal fish; 3.59 % Sculpin/eelpouts; 15.00 % Shrimp; 2 % Cephalopods; 20.23 % Euphausiids/Mysids
+
+
+seabird_amphipod_kJ_year <- (16.52+13.23)/100*E_seabird_kJ_year
+seabird_mysid_kJ_year <- (20.23/100)*E_seabird_kJ_year
+seabird_copepod_kJ_year <- (2/100)*E_seabird_kJ_year
+seabird_squid_kJ_year <- (2/100)*E_seabird_kJ_year
+seabird_crustaceans_kJ_year <- (15)/100*E_seabird_kJ_year
+seabird_cod_kJ_year <- 10.05/100*E_seabird_kJ_year
+seabird_sculpin_kJ_year <- 3.59/100*E_seabird_kJ_year 
+seabird_fish_kJ_year <- (14.74 + 2.64)/100*E_seabird_kJ_year 
+
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+seabird_amphipod_ton_year <- seabird_amphipod_kJ_year/(3.27*1e+06) 
+seabird_mysid_ton_year <- seabird_mysid_kJ_year/(3.77*1e+06)
+seabird_copepod_ton_year <- seabird_copepod_kJ_year/(3.8*1e+06)
+seabird_squid_ton_year <- seabird_squid_kJ_year/(6.9*1e+06)
+seabird_crustaceans_ton_year <- seabird_crustaceans_kJ_year/(4*1e+06) 
+seabird_cod_ton_year <- seabird_cod_kJ_year/(4.5*1e+06)
+seabird_sculpin_ton_year <- seabird_sculpin_kJ_year/(4.155*1e+06)
+seabird_fish_ton_year <- seabird_fish_kJ_year/(5*1e+06)
+
+
+#Assuming a 75 % assimilation rate 
+
+Q_seabird_ton_year <- seabird_amphipod_ton_year + seabird_mysid_ton_year + seabird_copepod_ton_year + seabird_squid_ton_year + seabird_crustaceans_ton_year + seabird_cod_ton_year + seabird_sculpin_ton_year + seabird_fish_ton_year + (seabird_amphipod_ton_year + seabird_mysid_ton_year + seabird_copepod_ton_year + seabird_squid_ton_year + seabird_crustaceans_ton_year + seabird_cod_ton_year + seabird_sculpin_ton_year + seabird_fish_ton_year)*0.25
+
+
+QB_seabird <- Q_seabird_ton_year*(abundance_TBM+abundance_BLK+abundance_NF)/Biomass_seabirds
+
+
+
+#####################################################################################
+#Based on FMR data available for different species################################
+####################################################################################
+
+E_TBM_kJ_year_FMR <- 2036*365
+E_BLK_kJ_year_FMR <- (772+753+865)*365
+E_NF_kJ_year_FMR <- 1444*365
+
+E_seabird_kJ_year_FMR <- E_TBM_kJ_year_FMR*(Biomass_TBM/Biomass_seabirds) + E_BLK_kJ_year_FMR*(Biomass_BLK/Biomass_seabirds) + E_NF_kJ_year_FMR*(Biomass_NF/Biomass_seabirds)
+
+#Convert kJ/year to ton/year based on diet composition and energetics of diet
+
+#Diet composition is 16.52 % Omnivorous zooplankton; 2 % Calanus; 13.23 % Carnivorous zooplankton; 10.05 % Arctic/polar cod; 14.74 % Other marine fish; 2.64 % Other demersal fish; 3.59 % Sculpin/eelpouts; 15.00 % Shrimp; 2 % Cephalopods; 20.23 % Euphausiids/Mysids
+
+
+seabird_amphipod_kJ_year_FMR <- (16.52+13.23)/100*E_seabird_kJ_year_FMR
+seabird_mysid_kJ_year_FMR <- (20.23/100)*E_seabird_kJ_year_FMR
+seabird_copepod_kJ_year_FMR <- (2/100)*E_seabird_kJ_year_FMR
+seabird_squid_kJ_year_FMR <- (2/100)*E_seabird_kJ_year_FMR
+seabird_crustaceans_kJ_year_FMR <- (15)/100*E_seabird_kJ_year_FMR
+seabird_cod_kJ_year_FMR <- 10.05/100*E_seabird_kJ_year_FMR
+seabird_sculpin_kJ_year_FMR <- 3.59/100*E_seabird_kJ_year_FMR 
+seabird_fish_kJ_year_FMR <- (14.74 + 2.64)/100*E_seabird_kJ_year_FMR 
+
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+seabird_amphipod_ton_year_FMR <- seabird_amphipod_kJ_year_FMR/(3.27*1e+06) 
+seabird_mysid_ton_year_FMR <- seabird_mysid_kJ_year_FMR/(3.77*1e+06)
+seabird_copepod_ton_year_FMR <- seabird_copepod_kJ_year_FMR/(3.8*1e+06)
+seabird_squid_ton_year_FMR <- seabird_squid_kJ_year_FMR/(6.9*1e+06)
+seabird_crustaceans_ton_year_FMR <- seabird_crustaceans_kJ_year_FMR/(4*1e+06) 
+seabird_cod_ton_year_FMR <- seabird_cod_kJ_year_FMR/(4.5*1e+06)
+seabird_sculpin_ton_year_FMR <- seabird_sculpin_kJ_year_FMR/(4.155*1e+06)
+seabird_fish_ton_year_FMR <- seabird_fish_kJ_year_FMR/(5*1e+06)
+
+
+#Assimilation efficiency based on Brekke and Gabrielsen 1994 Polar Biology for kittiwakes and murres fed Arctic cod 
+
+ass_efficiency <- 1- ((83.1+78.2)/2/100)
+
+Q_seabird_ton_year_FMR <- seabird_amphipod_ton_year_FMR + seabird_mysid_ton_year_FMR + seabird_copepod_ton_year_FMR + seabird_squid_ton_year_FMR + seabird_crustaceans_ton_year_FMR + seabird_cod_ton_year_FMR + seabird_sculpin_ton_year_FMR + seabird_fish_ton_year_FMR + (seabird_amphipod_ton_year_FMR + seabird_mysid_ton_year_FMR + seabird_copepod_ton_year_FMR + seabird_squid_ton_year_FMR + seabird_crustaceans_ton_year_FMR + seabird_cod_ton_year_FMR + seabird_sculpin_ton_year_FMR + seabird_fish_ton_year_FMR)*ass_efficiency
+
+
+QB_seabird_FMR <- Q_seabird_ton_year_FMR*(abundance_TBM+abundance_BLK+abundance_NF)/Biomass_seabirds
+
+
+   
+```
+
+
+
+  

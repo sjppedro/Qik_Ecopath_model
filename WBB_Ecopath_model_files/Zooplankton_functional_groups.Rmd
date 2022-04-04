@@ -1,0 +1,922 @@
+---
+title: "Zooplankton-parameters"
+author: "Sara Pedro"
+date: "20/08/2019"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo =FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(data.table)
+
+setwd("C:/Users/Sara/Desktop/WBB_Ecopath_model_files") #set your working directory here
+
+```
+
+The full citation corresponding to the literature cited in this file can be found in the Ecopath technical report for this project.
+The data used here is from Saint-Béat et al 2019 and available in https://www.seanoe.org/data/00487/59892/.
+
+## Basic input
+
+From the GreenEdge Project:
+
+- Calanus copepods (CAL)
+- Omnivorous zooplankton (OMN)
+- Carnivorous zooplankton (CAR)
+
+
+```{r}
+data<-read.csv("Bodymass_zoo.csv")
+
+data_groups <- data %>%
+              filter(Class == "UP") %>%
+              mutate(Stage = replace(Stage, is.na(Stage), "M")) %>% #the M classification is not correct - just to get rid of NAs
+              filter(!Stage == "Total") %>%
+              select(Group, Species) %>%
+              mutate(Group = replace(Group, Group == "Omnivore", "Omnivorous")) %>%
+              arrange(Group) %>%
+              distinct(Species, .keep_all = TRUE) 
+
+kable(data_groups) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+```
+
+For this work Saint-Béat et al removed rare species, i.e., only species that had at least one individual at half of the stations were kept.
+
+
+Notes on important species (from Canada's Arctic Marine Atlas)
+
+#### Amphipods and pteropods
+
+**Amphipods** (tipically 12-25 mm) are a diverse group of crustacean zooplankton. The two main families in the Arctic are Gammaridae and Hyperiidae. Gammaridae are primarily found beneath the sea ice and on the sea bottom, while Hyperiidae are most common in open waters (surface-dwelling). 
+
+Of Gammaridae, the species *Onisimus glacialis* and *Onisimus litoralis* are the most abundant in sea ice and sea bottom habitats in the Canadian Arctic. 
+
+Of Hyperiidae, *Themisto libellula* is one of the most abundant. It is primarily carnivorous and feeds on calanoid copepods.
+
+
+**Pteropods** are a zooplankton group of free-swimming mollucs. The two most abundant are the shelled species *Limacina helicina* (up to 8 cm) and a naked species *Clione limacina* (up to 4 cm). The first is an omnivorous filter feeder while the second is carnivorous in its adult form and feeds almost exclusively on *L. helicina*.
+
+
+#### Calanoid copepods
+
+Most abundant type of zooplankton. The zooplankton biomass in the Arctic is dominated by *Calanus glacialis* and *Calanus hyperboreus* (between 3-8 mm), but others are present such as *Calanus finmarchicus*, *Pseudocalanus spp.*, *Metridia longa*, *Triconia borealis* and *Microcalanus spp.*.
+
+*C. glacialis* and *C. hyperboreus* are herbivores and graze on large amounts of phytoplankton and ice algae, especially during the spring bloom. They convert carbon from primary producers into energy-rich lipid reserves.
+
+
+### Biomass 
+**For Calanus, Omnivorous and Carnivorous**
+
+Biomasses for the GreenEdge Project (see Saint-Béat et al 2019) were calculated based on weight and abundance. Weight was derived from sizes. The formulas to do these calculations are in the excel sheet *Bodymass_zoo*.
+
+The units used in the GreeEdge Project were ug of Carbon and the values were in minimum biomass and maximum biomass. So first we converted it to ton ww per square km. And because the range between max and min was not very large for these species, we calculated the average to get an approximate mean biomass (good enough for Ecopath).
+
+Saint-Béat et al calculated bodymass in ugC.ind^-1 (micrograms of carbon per individual). So I tried to calculate bodymass per species in dry weight to then convert to wet weight.
+
+I have minimum and maximum size of each species in um (micrometers). I need to calculate bodymass first by applying a function to body size. Them I multiply that by abundance and get the biomass of each species.
+
+
+## For calculations in wet weight, these are the formulas per species. 
+
+- C = carbon
+- DW = dry weight
+- WW = wet weight
+- AFDW = ash-free dry weight (assuming 10 % ashCarbon to be 40 % AFDW)
+- PL = prosome length
+- BL = maybe body length
+
+
+## *Calanus finmarchicus*
+Copepod
+
+$$C_{mg} = 0.0048*PL_{mm} {} ^{3.5687}$$
+
+for CIV and CV stages (Blanche used this equation for all stages)
+
+Madsen et al 2001
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = (0.0048*PL_{mm} {} ^{3.5687}) / 0.1$$
+
+
+
+## *Calanus glacialis*
+Copepod
+
+$$C_{ug} = 4.742*PL_{mm} {} ^{3.452}$$
+
+Forest et al 2011
+
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((4.742 * PL_{mm} {} ^{3.452})/1000) / 0.1$$
+
+
+
+
+## *Calanus hyperboreus*
+Copepod
+
+carbon content is assumed to be 60% of ash-free dry weight (from Hirche and Mumm 1992, in Madsen et al 2001)
+
+$$C_{ug} = 7.263*PL_{mm} {} ^{3.106}$$
+
+Forest et al 2011
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((7.263 * PL_{mm} {} ^{3.106})/1000) / 0.1$$
+
+
+
+## *Aglantha digitale*
+Other Mesozooplankton (cnidaria)
+
+$$DW_{mg} = 0.00194 * PL_{mm} {} ^{3.05}$$
+
+Matthews and Hestad 1977 (in Hopcroft et al 2005) 
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = (0.00194 * PL_{mm} {} ^{3.05})/ 0.04$$
+
+
+
+## *Eukrohnia hamata*
+Crustacean
+
+$$DW_{mg} = 0.00032 * PL_{mm} {} ^{3.00}$$
+Mathews and Hestad 1977 (in Hopcroft et al 2005)
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = (0.00032 * PL_{mm} {} ^{3.00}) / 0.2$$
+
+
+
+## *Gaetanus tenuispinus*
+Copepod
+
+$$AFDW_{mg} = 0.0089 * PL_{mm} {} ^{3.4119}$$
+
+
+Mumm 1991
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((0.0089 * PL_{mm} {} ^{3.4119}) / 0.9)/0.2$$
+
+
+
+## *Heterorhabdus norvegicus*
+Copepod
+
+$$AFDW_{mg} = 0.0031 * PL_{mm} {} ^{4.7164} $$
+Mumm 1991
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((0.0031 * PL_{mm} {} ^{4.7164})/0.9)/0.2$$
+
+
+## *Discoconchoecia elegans*
+Crustacean
+
+$$AFDW_{mg} = 0.0228 * PL_{mm} {} ^{2.3698}$$
+
+Mumm 1991
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((0.0228 * PL_{mm} {} ^{2.3698})/0.9)/0.2$$
+
+
+
+## *Boroecia maxima*
+Crustacean
+
+$$AFDW_{mg} = 0.0228 * PL_{mm} {} ^{2.3698}$$
+
+Mumm 1991
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((0.0228 * PL_{mm} {} ^{2.3698}) /0.9)/0.2$$
+
+
+
+## *Heterostylites major*
+Copepod
+
+$$C_{ug} = 10^{(3.07*log_{10}(PL_{um} {})-8.37)}$$
+
+
+Uye 1982
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((10^{(3.07 * log_{10}(PL_{mm})-8.37)})/ 1000) / 0.1 $$
+
+
+
+## *Limacina helicina*
+Other Mesozooplankton (pteropod)
+
+$$AFDW_{mg} = 0.0390 * PL_{mm} {} ^{3.5032}$$
+
+Mumm 1991 (in Hopcroft et al 2005)
+
+
+or
+
+$$DW_{mg} = 0.137 * D_{mm} {}^{1.5005}$$
+
+or
+
+$$WW = 0.000194 * L {} ^{2.5473}$$
+
+both in
+Bednarek et al 2012 for Limacina spp.
+
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((0.137 * D_{mm} {} ^{1.5005}) /0.23$$
+
+
+
+## *Metridia longa*
+Copepod
+
+$$C_{ug} = 7.498 * PL_{mm} {} ^{3.225}$$
+
+Forest et al 2011
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((7.498 * PL_{mm} {} ^{3.225})/1000) /0.1$$
+
+
+
+
+$$AFDW_{mg} = 0.0101 * PL_{mm} {} ^{3.0996}$$
+
+Mumm 1991
+
+
+## *Microcalanus*
+Copepod
+
+$$C_{ug} = 10^{(3.07*log_{10}(PL_{um} {})-8.37)}$$
+
+
+$$log DW_{ug} = 3.13 * log(L_{um})-8.18$$
+
+
+Uye 1982
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((10^{(3.07 * log_{10}(PL_{mm})-8.37)})/ 1000) / 0.1 $$
+
+
+
+## *Oithona similis*
+Copepod
+
+$$C_{ug} = 9.4676 * 10^{-7} * PL_{um}^{2.16}$$
+
+Sabatini and Kiørboe, 1994
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((9.4676 * 10^{-7} * (PL_{mm})^{2.16}) / 1000) / 0.1$$
+
+
+
+$$log AFDW_{ug} = 3.16 * log PL_{um} - 8.18$$
+
+Hopcroft et al 1998 (in Hopcroft et al 2005)
+
+
+## *Oncaea notopus/parila*
+Copepod
+
+$$log AFDW_{ug} = 3.16 * log PL_{um} - 8.18$$
+
+Hopcroft et al 1998 (in Hopcroft et al 2005)
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = (((10^{3.16 * log_{10} (PL_{mm}) - 8.18}) /1000)/0.9)/0.2$$
+
+
+## *Pseudocalanus spp.*
+Copepod
+
+$$C_{ug} = (10^{2.85 * log (PL{mm} * 1000)-7.62}) * 0.447$$
+
+$$log_{10} DW_{ug} = -7.62 + 2.85* log_{10} PL_{um}$$
+
+Liu and Hopcroft 2008
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((10^{-7.62 + 2.85* log_{10} (PL_{mm})})/1000) / 0.2$$
+
+
+## *Paraeuchaeta spp.*
+Copepod
+
+$$C_{mg} = (0.0075 * PL_{mm} {} ^{3.274} ) * 0.447 $$
+
+
+$$AFDW_{mg} = 0.0075 * PL_{mm} {} ^{3.274}$$
+
+
+Mumm 1991 (in Hopcroft et al 2005)
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((0.0075 * PL_{mm} {} ^{3.274}) /0.9)/0.2$$
+
+
+
+After here these ones are missing in previous group tables - double check what are the mistakes
+
+## *Spinocalanus longicornis*
+Copepod
+
+$$C_{ug} = 10^{3.07*log(PL_{um})-8.37}$$
+
+
+$$log DW_{ug} = 3.13 * log(L_{um})-8.18$$
+
+
+Uye 1982
+
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((10^{3.07* log(L_{mm})-8.37})/ 1000) / 0.1 $$
+
+
+
+
+
+## *Themisto abyssorum*
+Crustacean
+
+$$DW_{ug} = 0.0049 * BL_{mm} {} ^{2.957}$$
+
+
+Ikeda and Shiga 1999 (in Hopcroft et al 2005)
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((0.0049 * BL_{mm} {} ^{2.957}) /1000)/ 0.2$$
+
+
+## *Triconia borealis*
+Copepod
+
+$$C_{ug} = 9.4676 * 10^{-7} (L_{um})^{2.16}$$
+
+Sabatini and Kiørboe, 1994
+
+To calculate in wet weight (based on % conversions in Kiørboe 2013):
+
+$$WW_{mg} = ((9.4676 * 10^{-7} (L_{mm})^{2.16}) /1000)/ 0.1$$
+
+
+
+## Conversions Carbon to dry weight
+Copepoda (Mauchline 1998, in Bouchard et al 2014):
+
+C = 44.7 % DW
+
+in Uye 1982
+
+C = 35.2-52.8 % DW ; average -> 41.5 %
+
+
+Other Zooplankton (Legendre and Michaud 1998 in Bouchard et al 2014):
+
+C = 40 % DW
+
+
+## Conversions dry weight to wet weight - Kiørboe 2013 (Limnol. Oceanogr.)
+
+### Copepods
+- Dry (% wet) = 16.2 +/- 2.4 
+- Ash (% dry) = 7.6 +/- 1.8
+- C (% dry) = 48 +/- 1.4
+- C (% wet) = 9.95 +/- 1.49
+
+$$log DW_{mg} = -0.67 + 0.96 * log(WW_{mg})$$
+
+$$log C_{mg} = -0.93 + 0.95 * log(WW_{mg})$$
+
+
+### All crustaceans
+- Dry (% wet) = 18.3 +/- 1.9 
+- Ash (% dry) = 11.5 +/- 2.4 
+- C (% dry) = 43.5 +/- 1.3
+- C (% wet) = 9.61 +/- 0.01
+
+
+### Cnidarians
+- Dry (% wet) = 4.1 +/- 0.3 
+- Ash (% dry) = 52.4 +/- 6.4 
+- C (% dry) = 13.2 +/- 2.1
+- C (% wet) = 0.48 +/- 0.13 
+
+### Pteropods
+- Dry (% wet) = 23.0 +/- 19.4 
+- Ash (% dry) = 30.9 +/- 93.1 
+- C (% dry) = 28.9 +/- 4.8
+- C (% wet) = 5.3 +/- 5.5 
+
+In Bednarek et al 2012 he uses the following conversion:
+
+DW = WW x 0.28 (Davis and Wiebe 1985)
+
+and a conversion factor of 0.25 from DW to carbon.
+
+
+### Euphausiids
+- Dry (% wet) = 22.8 +/- 1.4 
+- Ash (% dry) = 12.1 +/- 3.6
+- C (% dry) = 41.9 +/- 4.1
+- C (% wet) = 10.7 +/- 3.2
+
+
+
+$$log DW_{mg} = -0.69 + 1.03 * log(WW_{mg})$$
+
+$$log C_{mg} = -1.02 + 1.01 * log(WW_{mg})$$
+
+
+### Amphipods
+- Dry (% wet) = 23.9 +/- 9.0 
+- Ash (% dry) = 20.7 +/- 6.7
+- C (% dry) = 34.5 +/- 3.2
+- C (% wet) = 8.41 +/- 1.38
+
+
+$$log DW_{mg} = -0.57 + 0.92 * log(WW_{mg})$$
+
+$$log C_{mg} = -0.99 + 0.92 * log(WW_{mg})$$
+
+
+Water content as percent of wet weight; Carbon as percent of dry weight; Ash as percent of dry weight  (Ikeda and Skjoldal 1989) - zooplankton collected in the Arctic in the summer (May to August)
+
+*Aglantha digitale*
+
+- Water = 94 +/- 0.1 (% WW)
+- C = 16.69 +/- 0.5 (% DW)
+- Ash = 56.5 +/- 0.2 (% DW)
+                       
+*Limacina helicina*
+
+- Water = 77.8 +/- 0.8 (% WW)
+- C = 37.12 +/- 0.08 (% DW)
+- Ash = 28.6 +/- 0.9 (% DW)
+                       
+*Calanus finmarchicus*
+
+- Water = 73.5 +/- 1.0 (% WW)
+- C = 55.54 +/- 0.06 (% DW)
+- Ash = 7.9 +/- 0.1 (% DW)
+
+*Calanus glacialis* 
+
+- Water = 79.7 +/- 0.5 or 76.6 +/- 1.0 (% WW)
+- C = 44.81 +/- 0.22 or 50.31 +/- 0.12 (% DW)
+- Ash = 10.4 +/- 0.1 or 8.8 +/- 0.1 (% DW)
+
+*Calanus hyperboreus* 
+
+- Water = 68.0 +/- 3.8 (% WW)
+- C = 59.17  +/- 1.46 (% DW)
+- Ash = 6.5 +/- 0.0 (% DW)
+
+*Metridia longa* 
+
+- Water = 77.2 +/- 1.6 (% WW)
+- C = 47.42 +/- 0.29 (% DW)
+- Ash = 9.1 +/- 0.0 (% DW)
+
+Chaetognatha *Sagita elegans*
+
+- Water = 89.4 +/- 0.5 (% WW)
+- C = 38.44 +/- 0.09 (% DW)
+- Ash = 10.2 +/- 0.3 (% DW)
+
+
+
+
+
+```{r}
+
+#Functions to calculate bodymass for each zooplankton species based on body size. Calculations in mg of wet weight
+
+
+C.finmarchicus <- function(L_mm) {
+   WW_mg = (0.0048*(L_mm^3.5687)) / 0.1
+   return(WW_mg)
+}
+
+C.glacialis <- function(L_mm) {
+   WW_mg = ((4.742 * (L_mm^3.452)) /1000)/ 0.1
+   return(WW_mg)
+}
+
+C.hyperboreus <- function(L_mm) {
+   WW_mg = ((7.263 * (L_mm^3.106)) /1000)/ 0.1
+   return(WW_mg)
+}
+
+C.hyperboreus2 <- function(L_mm) {
+   WW_mg = (0.003 * (L_mm^3.781)) / 0.2
+   return(WW_mg)
+} #formula in Ashjian et al 2003
+
+
+A.digitale <- function(L_mm) {
+   WW_mg = (0.00194 * L_mm^(3.05))/ 0.04
+   return(WW_mg)
+}
+
+E.hamata <- function(L_mm) {
+   WW_mg = (0.00032 * (L_mm^3.00)) / 0.2
+   return(WW_mg)
+}
+
+G.tenuispinus <- function(L_mm) {
+   WW_mg = ((0.0089 * (L_mm^3.4119))/0.9)/0.2
+   return(WW_mg)
+}
+
+H.norvegicus <- function(L_mm) {
+   WW_mg = ((0.0031 * (L_mm^4.7164))/0.9)/0.2
+   return(WW_mg)
+}
+
+D.elegans <- function(L_mm) {
+   WW_mg = ((0.0228 * (L_mm^2.3698)) / 0.9)/0.2
+   return(WW_mg)
+}
+
+B.maxima <- function(L_mm) {
+   WW_mg = ((0.0228 * (L_mm^2.3698)) / 0.9)/0.2
+   return(WW_mg)
+}
+
+H.major <- function(L_mm) {
+   WW_mg = ((10^(3.07 * log10(L_mm)-8.37))/1000)/0.1
+   return(WW_mg)
+}
+
+L.helicina <- function(L_mm) {
+   WW_mg = (0.0390 * L_mm^(3.5032)) / (0.309*0.23)
+   return(WW_mg)
+}
+
+L.helicina2 <- function(L_mm) {
+   WW_mg = (0.137 * L_mm^(1.5005))/0.23
+   return(WW_mg)
+}
+
+
+M.longa <- function(L_mm) {
+   WW_mg = ((7.498 * (L_mm^3.225))/1000) /0.1
+   return(WW_mg)
+}
+
+
+M.longa2 <- function(L_mm) {
+   WW_mg = (0.0101 * (L_mm^3.0996)) /0.2
+   return(WW_mg)
+}
+
+
+Microcalanus <- function(L_mm) {
+   WW_mg = ((10^(3.07 * log10(L_mm)-8.37))/1000)/0.1
+   return(WW_mg)
+}
+
+O.similis <- function(L_mm) {
+   WW_mg = ((9.4676 * 10^(-7)*L_mm^(2.16))/ 1000)/0.1
+   return(WW_mg)
+}
+ 
+O.notopus <- function(L_mm) {
+   WW_mg = (((10^(3.16 * log10(L_mm) - 8.18))/1000)/0.9)/0.2
+   return(WW_mg)
+}
+
+Pseudocalanus <- function(L_mm) {
+   WW_mg = (10^(-7.62 + 2.85* log10(L_mm))/1000)/0.2
+   return(WW_mg)
+}
+
+Paraeuchaeta <- function(L_mm) {
+   WW_mg = ((0.0075 * L_mm^(3.274)) /0.9)/0.2
+   return(WW_mg)
+}
+
+S.longicornis <- function(L_mm) {
+   WW_mg = ((10^(3.07 * log10(L_mm)-8.37)) /1000)/0.1
+   return(WW_mg)
+}
+
+T.abyssorum <- function(L_mm) {
+   WW_mg = ((0.0049 * L_mm^(2.957)) / 1000) /0.2
+   return(WW_mg)
+}
+
+T.borealis <- function(L_mm) {
+   WW_mg = ((9.4676 * 10^(-7)*L_mm^(2.16))/1000) /0.1
+   return(WW_mg)
+}
+
+
+
+data_new_biomass <- data %>%
+          filter(Class == "UP") %>%
+          mutate(Stage = replace(Stage, is.na(Stage), "M")) %>%
+          filter(!Stage == "Total") %>%
+          mutate(Group = replace(Group, Group == "Omnivore", "Omnivorous")) %>%
+          select(Species, Stage, Group, Abundance, Size_min_mm, Size_max_mm, bodymass.min.ugC.ind.1., bodymass.max.ugC.ind.1., Biomass.min.ugC., Biomass.max..ugC.) %>%
+          mutate(Bodymass.mean.ugC = (bodymass.min.ugC.ind.1. + bodymass.max.ugC.ind.1.)/2) %>%
+          mutate(Biomass.mean.ugC.sqm = (Biomass.max..ugC.+Biomass.min.ugC.)/2) %>%
+          #apply functions to each species
+          mutate(Bodymass.min.mg.ww = case_when(Species == "Calanus finmarchicus" ~ C.finmarchicus(Size_min_mm),
+                                             Species == "Calanus glacialis" ~ C.glacialis(Size_min_mm),
+                                             Species == "Boroecia maxima" ~ B.maxima(Size_min_mm),
+                                             Species == "Calanus hyperboreus" ~ C.hyperboreus2(Size_min_mm),
+                                             Species == "Discoconchoecia elegans" ~ D.elegans(Size_min_mm),
+                                             Species == "Gaetanus tenuispinus" ~ G.tenuispinus(Size_min_mm),
+                                             Species == "Heterorhabdus norvegicus" ~ H.norvegicus(Size_min_mm),
+                                             Species == "Heterostylites major" ~ H.major(Size_min_mm),
+                                             Species == "Metridia longa" ~ M.longa2(Size_min_mm),
+                                             Species == "Microcalanus" ~ Microcalanus(Size_min_mm),
+                                             Species == "Oithona similis" ~ O.similis(Size_min_mm),
+                                             Species == "Oncaea notopus/parila" ~ O.notopus(Size_min_mm),
+                                             Species == "Paraeuchaeta spp." ~ Paraeuchaeta(Size_min_mm),
+                                             Species == "Pseudocalanus spp." ~ Pseudocalanus(Size_min_mm),
+                                             Species == "Spinocalanus longicornis" ~ S.longicornis(Size_min_mm),
+                                             Species == "Themisto abyssorum" ~ T.abyssorum(Size_min_mm),
+                                             Species == "Triconia borealis" ~ T.borealis(Size_min_mm),
+                                             Species == "Aglantha digitale" ~ A.digitale(Size_min_mm),
+                                             Species == "Eukrohnia hamata" ~ E.hamata(Size_min_mm),
+                                             Species == "Limacina helicina" ~ L.helicina2(Size_min_mm),
+                                             TRUE~3),
+                Bodymass.max.mg.ww = case_when(Species == "Calanus finmarchicus" ~ C.finmarchicus(Size_max_mm),
+                                             Species == "Calanus glacialis" ~ C.glacialis(Size_max_mm),
+                                             Species == "Boroecia maxima" ~ B.maxima(Size_max_mm),
+                                             Species == "Calanus hyperboreus" ~ C.hyperboreus2(Size_max_mm),
+                                             Species == "Discoconchoecia elegans" ~ D.elegans(Size_max_mm),
+                                             Species == "Gaetanus tenuispinus" ~ G.tenuispinus(Size_max_mm),
+                                             Species == "Heterorhabdus norvegicus" ~ H.norvegicus(Size_max_mm),
+                                             Species == "Heterostylites major" ~ H.major(Size_max_mm),
+                                             Species == "Metridia longa" ~ M.longa2(Size_max_mm),
+                                             Species == "Microcalanus" ~ Microcalanus(Size_max_mm),
+                                             Species == "Oithona similis" ~ O.similis(Size_max_mm),
+                                             Species == "Oncaea notopus/parila" ~ O.notopus(Size_max_mm),
+                                             Species == "Paraeuchaeta spp." ~ Paraeuchaeta(Size_max_mm),
+                                             Species == "Pseudocalanus spp." ~ Pseudocalanus(Size_max_mm),
+                                             Species == "Spinocalanus longicornis" ~ S.longicornis(Size_max_mm),
+                                             Species == "Themisto abyssorum" ~ T.abyssorum(Size_max_mm),
+                                             Species == "Triconia borealis" ~ T.borealis(Size_max_mm),
+                                             Species == "Aglantha digitale" ~ A.digitale(Size_max_mm),
+                                             Species == "Eukrohnia hamata" ~ E.hamata(Size_max_mm),
+                                             Species == "Limacina helicina" ~ L.helicina2(Size_max_mm),
+                                             TRUE~3)) %>% #calculate mean bodymass
+               mutate(Biomass.min.ton.ww.sqkm = (Bodymass.min.mg.ww/1000)*Abundance, Biomass.max.ton.ww.sqkm = (Bodymass.max.mg.ww/1000)*Abundance) %>%
+               mutate(Bodymass.mean.mg.ww = (Bodymass.min.mg.ww + Bodymass.max.mg.ww)/2) %>% #convert to ton ww per square km (abundance is per sqm)
+               mutate(Biomass.mean.ton.ww.sqkm = (Bodymass.mean.mg.ww/1000)*Abundance) 
+               
+
+# Bodymass in mg wet weight in square meters and biomass in ton of ww per square km per species
+
+biomass_tonWW_per_species <- data_new_biomass %>% 
+                              select(Group, Species, Abundance, Size_min_mm, Size_max_mm, Bodymass.mean.mg.ww, Biomass.mean.ton.ww.sqkm, Biomass.min.ton.ww.sqkm, Biomass.max.ton.ww.sqkm, Biomass.mean.ugC.sqm, Bodymass.mean.ugC, Biomass.max..ugC., Biomass.min.ugC.) %>%
+                              group_by(Species, Group) %>%
+                              summarise(Size_min_mm = min(Size_min_mm), Size_max_mm = max(Size_max_mm), Abundance.sqm = sum(Abundance), Bodymass.mean.ugC = mean(Bodymass.mean.ugC),Biomass.mean.ugC.sqm = sum(Biomass.mean.ugC.sqm), Bodymass.mean.mg.ww = mean(Bodymass.mean.mg.ww), Biomass.mean.ton.ww.sqkm = sum(Biomass.mean.ton.ww.sqkm), Biomass.min.ton.ww.sqkm = sum(Biomass.min.ton.ww.sqkm), Biomass.max.ton.ww.sqkm = sum(Biomass.max.ton.ww.sqkm), Biomass.min.ugC.sqm = sum(Biomass.min.ugC.), Biomass.max.ugC.sqm = sum(Biomass.max..ugC.)) 
+   
+
+
+# Per group
+
+# Calanus are able to limit their metabolic costs in winter in order to survive their unfavorable surroundings (Saint-Béat et al 2020). They accumulate energy-rich compounds (lipids) that form up to 70% of their body mass (e.g., Falk-Petersen et al., 1990; Maps et al., 2014), which allows them to be auto-sufficient during the lean season. By this life trait, they transfer the carbon produced by primary producers during the short summer period to higher trophic levels during the rest of the year. Thus, they produce and consume only in summer but their biomass is present whole year round
+
+# Carnivorous and omnivorous mesozooplankton feed all year round and do not accumulate significant reserves during summer. Thus, their production and consumption has to reflect the whole year, whereas the biomass is the same the whole year.
+
+old_groups <- biomass_tonWW_per_species %>% 
+         group_by(Group) %>%
+         summarise(Abundance.sqkm = sum(Abundance.sqm/10^(-6)), Length.min.mm = min(Size_min_mm), Length.max.mm = max(Size_max_mm), Biomass.mean.ton.ww.sqkm = sum(Biomass.mean.ton.ww.sqkm), Biomass.mean.ugC.sqm = sum(Biomass.mean.ugC.sqm), Biomass.min.ton.ww.sqkm = sum(Biomass.min.ton.ww.sqkm), Biomass.max.ton.ww.sqkm = sum(Biomass.max.ton.ww.sqkm), Biomass.min.ugC.sqm = sum(Biomass.min.ugC.sqm), Biomass.max.ugC.sqm = sum(Biomass.max.ugC.sqm)) %>% 
+         mutate(Group_abb = c("CAL", "CAR", "OMN")) 
+   
+         
+
+kable(data_new_biomass) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+kable(biomass_tonWW_per_species) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+kable(old_groups) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+
+#########################################
+
+#Alternatively I could just convert Blanche's results for biomass based on the conversion factors for each species 
+
+
+data_new_biomass_just_conversion <- data %>%
+         filter(Class == "UP") %>%
+        mutate(Stage = replace(Stage, is.na(Stage), "M")) %>%
+        filter(!Stage == "Total") %>%
+       mutate(Group = replace(Group, Group == "Omnivore", "Omnivorous")) %>%
+       select(Species, Stage, Group, Abundance, Size_min_mm, Size_max_mm, bodymass.min.ugC.ind.1., bodymass.max.ugC.ind.1., Biomass.min.ugC., Biomass.max..ugC.) %>%
+        mutate(Bodymass.mean.ugC = (bodymass.min.ugC.ind.1. + bodymass.max.ugC.ind.1.)/2) %>%
+          mutate(Biomass.mean.ugC.sqm = (Biomass.max..ugC.+Biomass.min.ugC.)/2) %>%
+                  mutate(Conversion_factors = case_when(Species == "Calanus finmarchicus" ~ 0.1,
+                                             Species == "Calanus glacialis" ~ 0.1,
+                                             Species == "Boroecia maxima" ~ 0.1,
+                                             Species == "Calanus hyperboreus" ~ 0.1,
+                                             Species == "Discoconchoecia elegans" ~ 0.1,
+                                             Species == "Gaetanus tenuispinus" ~ 0.1,
+                                             Species == "Heterorhabdus norvegicus" ~ 0.1,
+                                             Species == "Heterostylites major" ~ 0.1,
+                                             Species == "Metridia longa" ~ 0.1,
+                                             Species == "Microcalanus" ~ 0.1,
+                                             Species == "Oithona similis" ~ 0.1,
+                                             Species == "Oncaea notopus/parila" ~ 0.1,
+                                             Species == "Paraeuchaeta spp." ~ 0.1,
+                                             Species == "Pseudocalanus spp." ~ 0.1,
+                                             Species == "Spinocalanus longicornis" ~ 0.1,
+                                             Species == "Themisto abyssorum" ~ 0.1,
+                                             Species == "Triconia borealis" ~ 0.1,
+                                             Species == "Aglantha digitale" ~ 0.1, #the correct conversion factor (~0.01) resulted in unreasonable biomass
+                                             Species == "Eukrohnia hamata" ~ 0.1,
+                                             Species == "Limacina helicina" ~ 0.05, #I will use the value I got from my function in the calculations above instead as this gives unreasonable results (I will use 5.34 ton WW/km2)
+                                             TRUE~3)) %>%
+                  mutate(Bodymass_mean_ugWW = Bodymass.mean.ugC/Conversion_factors, Bodymass_min_ugWW = bodymass.min.ugC.ind.1./Conversion_factors, Bodymass_max_ugWW = bodymass.max.ugC.ind.1./Conversion_factors) %>%
+                  mutate(Bodymass_mean_ton_ww = Bodymass_mean_ugWW*1e-12, Bodymass_min_ton_ww = Bodymass_min_ugWW*1e-12,
+                         Bodymass_max_ton_ww = Bodymass_max_ugWW*1e-12) %>%
+                  mutate(Biomass.mean.ton.ww.sqkm = Bodymass_mean_ugWW*1e-6*Abundance,
+                         Biomass.min.ton.ww.sqkm = Bodymass_min_ugWW*1e-6*Abundance,
+                         Biomass.max.ton.ww.sqkm = Bodymass_max_ugWW*1e-6*Abundance)
+                   #convert from ugC/m2 to tonww/km2
+
+# Per species
+
+biomass_tonWW_per_species_just_conversion <- data_new_biomass_just_conversion %>% 
+                              select(Group, Species, Abundance, Bodymass_mean_ton_ww,Bodymass_min_ton_ww,
+                                     Bodymass_max_ton_ww, Biomass.mean.ton.ww.sqkm, Biomass.min.ton.ww.sqkm, 
+                                     Biomass.max.ton.ww.sqkm, Biomass.mean.ugC.sqm, Biomass.min.ugC., Biomass.max..ugC.) %>%
+                              group_by(Species, Group) %>%
+                              summarise(Abundance.sqm = sum(Abundance), Biomass.mean.ton.ww.sqkm = sum(Biomass.mean.ton.ww.sqkm), Biomass.min.ton.ww.sqkm = sum(Biomass.min.ton.ww.sqkm), Biomass.max.ton.ww.sqkm = sum(Biomass.max.ton.ww.sqkm),  Biomass.mean.ugC.sqm = sum(Biomass.mean.ugC.sqm), Bodymass_mean_ton_ww = mean(Bodymass_mean_ton_ww), Biomass.min.ugC.sqm = sum(Biomass.min.ugC.), Biomass.max.ugC.sqm = sum(Biomass.max..ugC.))  
+
+
+# Per group
+
+
+old_groups_just_conversion <- biomass_tonWW_per_species_just_conversion %>% 
+         group_by(Group) %>%
+         summarise(Abundance.sqm = sum(Abundance.sqm), Biomass.mean.ton.ww.sqkm = sum(Biomass.mean.ton.ww.sqkm), Biomass.min.ton.ww.sqkm = sum(Biomass.min.ton.ww.sqkm), Biomass.max.ton.ww.sqkm = sum(Biomass.max.ton.ww.sqkm),  Biomass.mean.ugC.sqm = sum(Biomass.mean.ugC.sqm), Bodymass_mean_ton_ww = mean(Bodymass_mean_ton_ww), Biomass.min.ugC.sqm = sum(Biomass.min.ugC.sqm), Biomass.max.ugC.sqm = sum(Biomass.max.ugC.sqm))  %>% 
+         mutate(Group_abb = c("CAL", "CAR", "OMN"))  
+         
+
+# I decided using the values for Calanus and Omnivorous zooplankton from the first approach, and for Carnivorous zooplankton from this second approach (there was some problem in the conversions for Aglantha digitale in the first approach). 
+
+```
+
+
+### Production/biomass P/B (/month) and consumption/biomass QB (/month) 
+**For Calanus, Omnivorous and Carnivorous**
+
+The production and consumption values were calculated from the GreenEdge project. Production/biomass and Consumption/biomass were calculated by dividing production or consumption by biomass.
+
+
+```{r}
+# these flows were calculated in Saint-Béat et al 2020 based on functions from Moloney and Field 1989 (table 4) 
+
+flow<-read.csv("Flows_values.csv") %>%
+      select(flows,WBB)%>%
+      separate(flows,into=c("from","to"),sep="->",remove=T)
+      
+pdct<- filter(flow, !to %in% c("DOC","DET", "RES"))%>%
+        group_by(from)%>%
+       summarise(pdct=sum(WBB)) %>%
+         mutate(Group_abb = from)
+
+conso<-group_by(flow, to)%>%
+       summarise(conso=sum(WBB)) %>%
+      mutate(Group_abb = to)
+
+
+# production and consumption are in gC per square meter per month
+
+data4<- old_groups_just_conversion %>%
+        inner_join(pdct, by = "Group_abb") %>%
+        inner_join(conso, by = "Group_abb") %>%
+        select(-to, -from) %>%
+        mutate(pdct.ugC.sqm.month = pdct*1e+6, conso.ugC.sqm.month = conso*1e+6) %>%
+        mutate(PB = case_when(Group == "Calanus" ~ pdct.ugC.sqm.month*4/Biomass.mean.ugC.sqm,
+                              Group == "Carnivorous" ~ pdct.ugC.sqm.month*12/Biomass.mean.ugC.sqm,
+                              Group == "Omnivorous" ~ pdct.ugC.sqm.month*12/Biomass.mean.ugC.sqm),
+               QB = case_when(Group == "Calanus" ~ conso.ugC.sqm.month*4/Biomass.mean.ugC.sqm,
+                              Group == "Carnivorous" ~ conso.ugC.sqm.month*12/Biomass.mean.ugC.sqm,
+                              Group == "Omnivorous" ~ conso.ugC.sqm.month*12/Biomass.mean.ugC.sqm)) %>%
+       mutate(PB_min = case_when(Group == "Calanus" ~ pdct.ugC.sqm.month*4/Biomass.min.ugC.sqm,
+                           Group == "Carnivorous" ~ pdct.ugC.sqm.month*12/Biomass.min.ugC.sqm,
+                              Group == "Omnivorous" ~ pdct.ugC.sqm.month*12/Biomass.min.ugC.sqm),
+               QB_min = case_when(Group == "Calanus" ~ conso.ugC.sqm.month*4/Biomass.min.ugC.sqm,
+                              Group == "Carnivorous" ~ conso.ugC.sqm.month*12/Biomass.min.ugC.sqm,
+                              Group == "Omnivorous" ~ conso.ugC.sqm.month*12/Biomass.min.ugC.sqm)) %>%
+        mutate(PB_max = case_when(Group == "Calanus" ~ pdct.ugC.sqm.month*4/Biomass.max.ugC.sqm,
+                              Group == "Carnivorous" ~ pdct.ugC.sqm.month*12/Biomass.max.ugC.sqm,
+                              Group == "Omnivorous" ~ pdct.ugC.sqm.month*12/Biomass.max.ugC.sqm),
+              QB_max = case_when(Group == "Calanus" ~ conso.ugC.sqm.month*4/Biomass.max.ugC.sqm,
+                              Group == "Carnivorous" ~ conso.ugC.sqm.month*12/Biomass.max.ugC.sqm,
+                              Group == "Omnivorous" ~ conso.ugC.sqm.month*12/Biomass.max.ugC.sqm))
+
+# Assuming calanus only consumes and produces in the summer while carnivorous and omnivorous zooplankton consume and produce all year round
+
+# I did some corrections to the results above based on my prior calculations of biomass. For P/B and Q/B of Omnivorous zooplankton I am assuming that the biomass in ugC is 1/2 order of magnitude lower (considering lower biomass for A. digitale) resulting in a P/B of 6.26 /year and a Q/B of 20.1 / year. For Calanus, I am assuming lower biomass for C. hyperboreus based on the different formula I used for this species relative to Saint-Béat et al 2020. This results in a biomass for the group of 30 % lower. This resulted in a P/B of 4.898 /year and a Q/B of 12.557 /year for Calanus:
+
+
+PB_omnivorous <- (2453000*12)/(23496171/5)
+PB_omnivorous_max <- (2453000*12)/(44482176/5)
+PB_omnivorous_min <- (2453000*12)/(2510166.7/5)
+
+QB_omnivorous <- (7877000*12)/(23496171/5)
+QB_omnivorous_max <- (7877000*12)/(44482176/5)
+QB_omnivorous_min <- (7877000*12)/(2510166.7/5)
+
+
+
+PB_calanus <- (4072000*4)/(4750773*0.7)
+PB_calanus_max <- (4072000*4)/(3646089*0.7)
+PB_calanus_min <- (4072000*4)/(5855458*0.7)
+
+QB_calanus <- (10440000*4)/(4750773*0.7)
+QB_calanus_max <- (10440000*4)/(3646089*0.7)
+QB_calanus_min <- (10440000*4)/(5855458*0.7)
+
+
+
+   
+```
+
+
+
+### Diet matrix (%)
+Calculated based on consumption per group.
+**For Calanus, Omnivorous and Carnivorous**
+
+
+```{r}
+load("flow_mat.RData")
+mat<-flow_mat_WBB [1:10,1:10]
+consoT<-colSums(mat)
+diet_perc<-mat %*% diag(1/consoT*100)
+colnames(diet_perc)<-c("PHY","SIA","BAC","MIC","CAL","OMN","CAR","BSL","DET","DOC")
+
+kable(diet_perc) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F) 
+
+col_order <- c("BSL", "CAR", "OMN", "CAL", "MIC", "BAC", "SIA", "PHY", "DET", "DOC")
+row_order <- c("BSL", "CAR", "OMN", "CAL", "MIC", "BAC", "SIA", "PHY", "DET", "DOC")
+new_diet_perc <- diet_perc[row_order, col_order] #ordering from lower to higher trophic levels
+
+
+```
+
+

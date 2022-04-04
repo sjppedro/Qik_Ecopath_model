@@ -1,0 +1,2156 @@
+---
+title: "Marine mammals-parameters"
+author: "Sara Pedro"
+date: "20/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo =FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(png)      
+
+```
+
+The full citation corresponding to the literature cited in this file can be found in the Ecopath technical report for this project.
+
+## Functional Groups
+
+Marine mammals: 
+
+- Narwhal
+- Ringed seal
+- Bowhead whale
+- Walrus
+- Polar bear
+- Killer whale
+- Other seals (harbour, harp, and bearded seals)
+
+
+
+##Fishing mortality - harvest (/year)
+
+I calculated this based on landings (individuals/year to tones per km2) and biomass (tones per km2). 
+
+Fishing mortality = (landings_ind_year*weight_ton/area)/biomass
+
+
+## Production/biomass - P/B (/year)  
+
+Mortality for marine mammals was calculated based on values from life history tables and estimated of longevity based on equations from Barlow and Boveng, 1991 [1] cited by Hoover et al 2013, Ecological Modelling (supplementary information).
+
+eq.1 $L(x) = L_j(x)*L_c(x)*L_s(x)$
+
+eq.2 $L_j(x) = exp[(\frac{-a_1}{b_1})*(1-exp(-b_1*\frac{x}{\Omega})]$
+
+eq.3 $L_c(x) = exp[-a_2*\frac{x}{\Omega}]$
+
+eq.4 $L_s(x) = exp[(\frac{a_3}{b_3})*(1-exp(b_3*\frac{x}{\Omega})]$
+
+where
+
+$L_j(x)$ is mortality due to juvenile factors
+
+$L_c(x)$ is constant mortality experienced by all age classes
+
+$L_s(x)$ is mortality due to senescent factors
+
+$a_1, a_2, b_1, b_3$ allow flexibility in shape of survivorship curve
+
+$\Omega$ is longevity
+
+$x$ is age
+
+
+Survivorship curve parameters based on life histories of fur seals, monkeys and humans [1]:
+
+**Northern Fur Seal**  
+
+$a_1$ = 14.343; $a_2$ = 0.1710; $a_3$ = 0.0121; $b_1$ = 10.259 $b_3$ = 6.6878
+
+**Old World Monkeys**
+
+$a_1$ = 30.430; $a_2$ = 0.0000; $a_3$ = 0.7276; $b_1$ = 206.720; $b_3$ =  2.3188
+
+**Human (female)**     
+$a_1$ = 40.409; $a_2$ = 0.4772; $a_3$ = 0.0047; $b_1$ = 310.360; $b_3$ = 8.0290
+
+Mortality is then calculated as -ln(survivorship) for each year of longevity ($L_j(x)$, $L_c(x)$ and $L_s(x)$), and averaged over all ages ($x$) to give the P/B value.
+
+I am keeping these calculations in an Excel spreadsheet created by Carie Hoover and applied to my data (Mortality_calculations_marine_mammals). When I have time, I can figure out a way to code the survivorship models in R.
+
+[1] Barlow,J. and Boveng,P.(1991) Modeling age-specific mortality for marine mammal populations. Marine Mammal Science, 7(1):50-65
+
+
+```{r}
+
+#Functions to calculate mortality for marine mammals. The variables a1, a2, a3, b1 and b3 are specified under the calculations for each marine mammal species or functional group
+
+
+Juvenile_mortality <- function(x) {
+   L_j = (exp((-a1/b1) * (1-exp(-b1 * (x/long)))))
+   return(L_j)
+}
+
+Constant_mortality <- function(x) {
+   L_c = (exp(-a2 * (x/long)))
+   return(L_c)
+}
+
+Senescent_mortality <- function(x) {
+   L_s = (exp(a3/b3) * (1-exp(b3 * (x/long))))
+   return(L_s)
+}
+
+# Example of how to apply each function based on age
+
+a1 <-30.430
+a2 <-0.0000
+a3 <-0.7276
+b1 <-206.720
+b3 <-2.3188
+long <- 115 
+
+Juvenile_mortality(6) #testing the functions for a marine mammal with a longevity of 115 years at age 6
+Senescent_mortality(6)
+
+
+```
+
+
+### Consumption/biomass - Q/B (/year)
+
+When studies are available (normally for commercially-important species), consumption rates can be estimated from mean daily rations. 
+Based on the empirical formulae in  Innes et al 1987 and Trites et al 1997:
+
+$$DR = 0.1*W^{0.8}$$
+
+- DR - daily ration in kg $d^{-1}$
+- W - weight in kg
+
+
+Alternatively can use this one:
+
+Energetic equation:
+
+$$E = a M^{0.75}$$
+
+$E$- energy requirement per day (kcal/day)
+
+$M$- mean body weight (kg) 
+
+$a$- coefficient varying with the group of mammals 
+
+- 320 for otariids 
+- 200 for phocids 
+- 192 for mysticetes 
+- 317 for odontocetes 
+- 320 for sea otters
+
+1 kcal = 4.186 kJ 
+
+General energy density of prey items in Hunt et al 2000 [2]
+
+- Benthic invertebrates: 4 kJ/g
+- Crustacean zooplankton: 4 kJ/g
+- Small cephalopods: 3.5 kJ/g
+- Large cephalopods: 4 kJ/g
+- Epipelagic fishes (in the surface layers e.g. pollock, mackerel): 7 kJ/g
+- Mesopelagic fishes (in the middle layers e.g. myctophids, herring): 7 kJ/g
+- Miscellaneous: 5 kJ/g
+- Seabird and marine mammals: 7 kJ/g
+
+Hunt et al assumed an assimilation efficiency of 75% for the conversion of daily energy requirements to the amount of prey needed to meet those requirements.
+
+
+Energy density of prey items in Guenette and Christensen 2005 [2]
+
+- Cephalopods: 4.0 kJ/g ww
+- Gadids: 4.0 (3.0-5.0) J/mg ww 
+- Forage fish: 7.5 (4.0-11.0) J/mg ww
+- Flatfish: 3.0-5.0 J/mg ww
+- Arrowtooth flounder (*Reinhardtius stomias*): 5.15 J/mg ww
+- Mysids: 3.77 J/mg ww
+- Ctenophores: 0.17 J/mg ww
+- Decapoda: 15.14 J/mg DW = 15.14 x 0.258 ww = 3.91 J/mg ww
+- Sculpins: 3.05-5.26 J/mg ww (consider the average 4.155 J/mg ww)
+- *Euphausia superba* (as a proxy for Euphausiids): 3.73 J/mg ww
+- *Calanus helgolandicus* (as a proxy for Copepods): 22.61 J/mg AFDW = 22.61 x 0.904 DW x 0.186 WW = 3.80 J/mg ww 
+- Gastropoda: 18.24 J/mg DW = 18.24 x 0.088 ww = 1.61 J/mg ww
+- Bivalvia: 18.85 J/mg DW = 18.85 x 0.087 ww = 1.64 J/mg ww
+- Holothuroidea: 11.27 J/mg DW = 11.27 x 0.11 = 1.23 J/mg ww
+- Echinoidea: 3.40 J/mg DW = 3.40 x 0.333 = 1.13 J/mg ww
+- Priapulida: 20.09 J/mg DW = 20.09 x 0.095 = 1.90 J/mg ww
+- Amphipoda: 16.37 J/mg DW = 16.37 x 0.2 = 3.27 J/mg ww
+- Isopoda: 14.55 J/mg DW = 14.55 x 0.2 = 2.91 J/mg ww
+- *Natica clausa*: 3.31 J/mg ww
+- Polychaeta (several species): 2.03-4.43 J/mg ww (I averaged all values in table 21 to get 2.64 J/mg ww)
+
+Other, more specific sources:
+
+- Greenland halibut: 5.5 kJ/g ww in Lawson et al 1998 Mar. Ecol. Prog. Ser. near Newfoundland and Labrador, Canada
+- *Gonatus* (squid): 6.9 kJ/g ww in Lawson et al 1998 Mar. Ecol. Prog. Ser. near Newfoundland and Labrador, Canada
+- Arctic cod: 4.5 kJ/g ww in Harter et al 2012 for Hudson Bay
+- *Sagitta elegans* (representing Chaetognaths): 4.84-5.23 cal/mg dw ~ 5 cal/mg dw = 5 x 0.115 cal/mg ww = 0.577 x 4.186 = 2.42 J/mg ww in Percy & Fife 1981 Arctic
+
+
+[1] Guenette, S. Models of southeast Alaska & Cauffope,G. and Heymans, S. Energy contents and conversion factors for sea lion's prey. In S. Guenette and V. Christensen (Editors) (2005) Food Web Models and Data for Studying Fisheries and Environmental Impacts on Eastern Pacific Ecosystems,  vol. 13, pp. 106-179, Fisheries Centre Research Reports
+
+[2] Hunt, G., Kato, H., McKinnell, S., (2000) Predation by birds and mammals in the Subarctic North Pacific Ocean. PICES Scientific Report 14, North Pacific Marine Science Organization, Sidney, BC,
+168p.
+
+
+### Killer Whale
+
+
+**Weigth**: 
+
+Killer whale females weigh on average 1,974 kg while males weigh 2,587 based on growth curves (Titres and Pauly 1998, Can. J. Zool.).
+
+Lefort et al 2020 considered males weighing 486–4,597 kg and females 349–3,297 kg.
+
+
+```{r}
+
+weight_KW <- (1974+2587)/2
+weight_KW 
+
+#the weighed mean weight by age and sex in Lefort et al 2020 is higher than this - they do not report it directly but I backcalculated it from the DPERs equation
+
+weight_KW_Lefort <- (175876/454.5)^(4/3)
+
+weight_KW_max <- (4597+3297)/2
+weight_KW_min <- (486+349)/2
+
+
+```
+
+
+
+**Abundance**: 
+
+A recent study estimated a total population size estimate of 163 ± 27 in the eastern Canadian Arctic using photo-ID, during an assumed 90-day residency in the Arctic. During this period, the authors estimated killer whales would consume 1290 ± 214 narwhal.
+Forney & Wade (2006) report killer whales as common (0.20-0.40 individuals per 100 km2) in the eastern Canadian Arctic. Northern Baffin Island narwhal occupy 60,000 km2 during the summer (COSEWIC,2004). If we assume killer whales occupy this same area, this study estimate of 163 is comparable to Forney and Wade’s (60 000 km2 * 0.20-0.40 individuals per 100 km2 = 120-240 individuals).
+
+
+From Higdon et al 2012 the sightings occurring in Western Baffin Bay were 7.3 % of total sightings, including data from 1850 to 2008 (study by Lefort et al 2020 includes more recent years but does not specify % per region).
+
+```{r}
+
+Abundance_KW <- 163/81447.25  
+Abundance_KW
+
+Abundance_KW_reduced <- 163*0.073/81447.25 
+
+#Taking into account the range from Forney and Wade the abundance can vary
+
+Abundance_KW_min <- 0.2/100
+Abundance_KW_max <- 0.4/100
+```
+
+
+
+**Biomass**: 
+
+Calculated based on (weight_kg/1000)*abundance.
+
+
+```{r}
+
+Biomass_KW <- weight_KW/1000*Abundance_KW 
+Biomass_KW
+Biomass_KW_year <- Biomass_KW/4 #killer whales only come up North during the summer
+
+Biomass_KW_year_min <- weight_KW/1000*Abundance_KW_min/4
+Biomass_KW_year_max <- weight_KW/1000*Abundance_KW_max/4
+
+#based on Lefort et al and conversation with Cory Matthews
+
+Biomass_KW_reduced <- weight_KW_Lefort/1000*Abundance_KW_reduced 
+Biomass_KW_reduced_min <- weight_KW_min/1000*Abundance_KW_reduced
+Biomass_KW_reduced_max <- weight_KW_max/1000*Abundance_KW_reduced
+
+
+Biomass_KW_reduced_year <- weight_KW_Lefort/1000*Abundance_KW_reduced/4
+Biomass_KW_reduced_year_min <- weight_KW_min/1000*Abundance_KW_reduced/4
+Biomass_KW_reduced_year_max <- weight_KW_max/1000*Abundance_KW_reduced/4
+
+
+```
+
+
+**P/B**: 
+
+Longevity for killer whales is 80 years (Ford 2002).
+
+```{r}
+
+mortality_KW <- 0.030  #this value was calculated in the Mortality_calculations_marine_mammals spreadsheet - I used the same value as Carie Hoover (based on same longevity; surrogate 4)
+PB_KW <- mortality_KW
+PB_KW
+
+```
+
+
+
+**Diet composition**: 32.6 % Narwhal; 17.4 % beluga (import) + 15.2 % other whales (import); 15.2 % Bowhead; 16.7 % ringed and other seals; 0.75 % Walrus; 2.3 % fish (potentially larger fish like large demersal fish, halibut or greenland shark, and maybe some cephalopods)
+
+Can adjust the % of narwhal since it is not so important in the model area - might have more predation pressure from killer whales in northern Baffin Bay (another narwhal population) (reviewed in Lefort et al 2020).
+
+More detailed:
+
+32.6 % Narwhal;  17.4 % Beluga;  15.2 % Bowhead; 16.7 % Seals (other seals); 15.2 % Other whales; 0.75 % Walrus; 2.3 % Fish
+
+There is no quantitive diet composition studies for killer whales in the Baffin Bay area, or other eastern Canadian Arctic areas. There are two studies based on reported sightings of killer whale predation events - these are likely adding great amount of error as killer whales might also feed on fish (although thought to prefer marine mammals in Arctic waters) as predation on fish is not visible from observer standpoints (see Cory Matthews considerations above). 
+
+Sightings of killer whale predation in Nunavut (Foxe Basin, South and North Baffin, Hudson Bay) from 2007-2010 (Ferguson et al (2012)) report in % of interviewees:
+
+70 % Seals (ringed, harp, bearded, and hooded seals)	
+60 % Narwhals
+52 % Beluga	
+46 % Bowhead whales	
+6.7 % Fish	
+0.95 % minke whales
+
+From 2004-2009, a study in the Canadian Arctic reported number of predation events observed (Higdon et al (2012)), from which we derived the following proportions:
+
+51.35 % Monodontids (beluga and narwhal)
+31.53 % Bowhead whales
+11.7 % Phocids 	
+5.4 % Other prey 	
+
+
+From Hidgon (2007) figure 9 I estimated:
+
+43 Narwhal - 32.6 %
+23 Beluga - 17.4 %
+20 Bowhead - 15.2 %
+22 Seals - 16.7 %
+20 Other whales - 15.2 %
+1 Walrus - 0.75 %
+3 Fish - 2.3 % (maybe greenland halibut, cephalopods, etc)
+of 132 sightings 
+
+
+
+**Energetics - E**:
+
+Killer whale is an odontocete so a = 317. 
+
+Lefort et al 2020 estimated male (486–4,597 kg) DPERs ranging from 47,053 to 253,803 kcal/day, while female (349–3,297 kg) DPERs ranged from 36,673 to 197,816 kcal/day. The DPERs for an individual of weighted-mean age and sex, was 175,876 kcal/day. This for the Eastern Canadian Arctic population.
+
+
+```{r}
+
+# 320 for otariids, 200 for phocids, 192 for mysticetes, 317 for odontocetes, 320 for sea otters
+# Lefort et al 2020 assumed 385 for killer whales in FMR or 454.5 in DPER calculations
+
+E_KW <- 317*(weight_KW^0.75) 
+E_KW
+
+#Based on Lefort et al 2020
+
+E_KW_Lefort <- 175876
+E_KW_Lefort_lower <- 36673 
+E_KW_Lefort_upper <- 197816 
+
+
+```
+
+
+**Q/B**: 
+
+
+To calculate Q (consumption per individual), I first need to convert kcal/day to ton of food per year. For that, I need to know how many ton of killer whale food items correspond to these many kcal. 
+
+
+Lefort et al 2020 assumed narwhal energetic density (UNar) was 2,500 kcal/kg. According to Williams et al a ringed seal has 14.86 kJ/g (or 14860000 kJ/ton).
+
+```{r}
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_KW_kJ_year <- E_KW*4.186*365 #energy requirements of one walrus per year
+E_KW_kJ_year
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 22.6 % Narwhal;  20.4 % Bowhead; 15.4 % ringed seal; 20.6 % Other seals; 5 % Walrus; 1 % Greenland halibut; 3 % cephalopods; 5 % other marine fish; 2 % Seabirds; 5 % Greenland shark
+
+# Energy content of one ringed seal is appr. 600 MJ, while bearded seal is 3700 MJ (Pagano et al 2018). If one ringed seal weights 73.795 kg and one bearded seal weights 200 kg. I am assuming the energy content of seals to represent the diet of killer whales
+
+energy_seal_KJ_ton <- ((600*1000*1000/73.795) + (3700*1000*1000/200))/2 #energy in kJ per ton of ringed and bearded seal 
+
+marine_mammals_ton_year_KW <-E_KW_kJ_year/energy_seal_KJ_ton 
+
+
+#When summing these I get the consumption per year of one killer whale. Need to multiply by the abundance of polar bear to get consumption for killer whale per km2
+
+Q_KW_ton_year <- marine_mammals_ton_year_KW 
+
+QB_KW <- Q_KW_ton_year*Abundance_KW/Biomass_KW
+QB_KW 
+
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_KW_kJ_year <- E_KW*4.186*365 #energy requirements of one walrus per year
+E_KW_kJ_year
+
+
+
+#####################################################################################
+#Based on Lefort et al 2020 #######################################################
+##################################################################################
+
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_KW_kJ_year_Lefort <- E_KW_Lefort*4.186*365 #energy requirements of one killer whale per year
+E_KW_kJ_year_Lefort
+
+E_KW_kJ_year_Lefort_upper <- E_KW_Lefort_upper*4.186*365 #energy requirements of one killer whale per year
+E_KW_kJ_year_Lefort_upper
+
+E_KW_kJ_year_Lefort_lower <- E_KW_Lefort_lower*4.186*365 #energy requirements of one killer whale per year
+E_KW_kJ_year_Lefort_lower
+
+
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 32.6 % Narwhal; 17.4 % (import) + 15.2 % other whales (import); 15.2 % Bowhead; 16.7 % seals; 0.75 % Walrus; 2.3 % fish (potentially larger fish like large demersal fish, halibut or greenland shark, and maybe some cephalopods)
+
+# I am assuming the energy content of narwhal to represent the diet of killer whales since these may be the main prey in the Eastern Canadian Arctic
+
+energy_narwhal_KJ_ton <- (2500*4.186)/0.001
+
+
+Q_KW_ton_year_Lefort <- E_KW_kJ_year_Lefort/energy_narwhal_KJ_ton 
+Q_KW_ton_year_Lefort_upper <- E_KW_kJ_year_Lefort_upper/energy_narwhal_KJ_ton 
+Q_KW_ton_year_Lefort_lower <- E_KW_kJ_year_Lefort_lower/energy_narwhal_KJ_ton 
+
+
+QB_KW_Lefort <- Q_KW_ton_year_Lefort*Abundance_KW_reduced/Biomass_KW_reduced
+QB_KW_Lefort 
+
+QB_KW_Lefort_upper <- Q_KW_ton_year_Lefort_upper*Abundance_KW_reduced/Biomass_KW_reduced_max 
+QB_KW_Lefort_lower <- Q_KW_ton_year_Lefort_lower*Abundance_KW_reduced/Biomass_KW_reduced_min
+
+
+
+   
+```
+
+
+### Polar Bear
+
+
+**Weigth**: 300 kg 
+
+Took from Hoover's models, based on Stirling and Parkinson 2006.
+
+
+```{r}
+
+weight_PB <- 300
+weight_PB
+
+```
+
+
+**Abundance**:  
+
+The abundance of the Baffin Bay sub-population is approximately 3.5 bears/1000 km2 (Rode et al (2012)). 
+
+The mean estimate of total abundance of the BB subpopulation in 2012-2013 was 2,826 (95% CI = 2,059-3,593) polar bears. The mean estimate of total abundance 1994-1997 was 2,173 (95% CI = 1,252-3,093) bears (SWG 2016. 
+
+For my models I will use this more updated abundance in based on the range of habitat used by polar bears in Baffin Bay varying between 255,000 to 729,000 km2.
+
+
+```{r}
+
+Abundance_PB <- 2826/((255000+729000)/2) 
+Abundance_PB
+
+Abundance_PB_lower <- 2059/((255000+729000)/2)
+Abundance_PB_upper <- 3593/((255000+729000)/2)
+
+
+```
+
+
+
+**Biomass**:
+
+Calculated based on (weight_kg/1000)*abundance.
+
+
+```{r}
+
+Biomass_PB <- weight_PB/1000*Abundance_PB
+Biomass_PB
+
+Biomass_PB_lower <- weight_PB/1000*Abundance_PB_lower
+
+Biomass_PB_upper <- weight_PB/1000*Abundance_PB_upper
+
+
+```
+
+
+**Landings**: 
+
+Baffin Bay is a heavily-harvested population with a mean annual harvest of 212 bears per year (5-year mean, 2005–2009) and an assessed population size of 1546 (95% CI 690–2402; Obbard et al. 2010; average harvest rate of ca. 13.7%). Thus, about 7% of the population is harvested per year.
+
+Both Canada (Nunavut) and Greenland harvest polar bears from the BB subpopulation. During 1993-2005 (i.e., before quotas were introduced in Greenland) the combined (i.e., in both countries) annual harvest averaged 165 (range: 120-268) polar bears from the BB subpopulation. During 2006-2014 the combined annual harvest averaged 161 (range: 138-176) polar bears. Total harvest peaked between 2002 and 2005 coinciding with several events in harvest reporting and harvest management in both Canada and Greenland (SWG 2016)
+
+
+
+**Fishing mortality**: 
+
+(landings_ind_year*weight_ton/area)/biomass
+
+
+```{r}
+
+fishing_PB <- 165*(weight_PB/1000)/((255000+729000)/2)/Biomass_PB
+
+#Harvest ton/km2
+harvest_PB <- 165*(weight_PB/1000)/((255000+729000)/2)
+harvest_PB
+
+```
+
+
+
+**P/B**: 
+
+Longevity for polar bears is 25 years (Stirling (2002)).
+
+
+The mean estimates of total (i.e., including harvest mortality) survival in 2011-2013 were 0.90 (SE = 0.05) for females age ≥ 2 years, and 0.78 (SE = 0.06) for males age 2 ≥ years. The time-constant estimate of total survival for a combined age class of cubs-of-the-year and yearlings, over the entire period 1993-2013, was 0.87 (SE = 0.06). Estimates of un-harvested survival in 2011-2013 for females and males age ≥ 2 years were 0.91 (SE = 0.05) and 0.83 (SE = 0.06), respectively (SWG 2016).
+
+I calculated mortality based on the formulas from Carie Hoover and harvest mortality, giving 0.154 /year. This value was quite similar to that calculated in (SWG 2016).
+
+
+```{r}
+
+mortality_PB <- 0.096  #this value was calculated in the Mortality_calculations_marine_mammals spreadsheet - I used the same value as Carie Hoover (based on same longevity; surrogate 4)
+PB_PB <- fishing_PB + mortality_PB
+PB_PB
+
+PB_PB2 <- 1-(0.9+0.78+0.87)/3
+PB_PB2
+
+```
+
+
+
+**Diet composition**: 47.5 % ringed seal; 1 % walrus; 51.8 % Other seals; 1 % narwhal; 1 % Arctic char; 1 % Seabirds; 30 % Import (beluga whale)  
+
+
+More detailed:
+
+10.24 % Harp seal; 23.41 % Beluga whales; 51.22 % Ringed seal; 8.78 % Bearded seal; 1.95 % Narwhal; 1.95 % Walrus; 2.44 % Harbour seals
+
+There are no studies for Baffin Bay reporting food items in weight % contribution to diet. 
+In East Greenland from 1984-2011, a study reports the diet as:
+
+47.5 % Ringed seal	
+30.6 % Harp seal	
+16.7 % Hooded seal	
+4.5 % Bearded seal	
+0.7 % Narwhal	
+0 % Walrus 	
+
+in % biomass contribution to diet (McKinney et al 2013).
+
+A study in Baffin Bay from 2010-2012 reports:
+
+21 % Harp seal
+19 % Beluga whales
+40 % Ringed seal	
+10 % Bearded seal	
+<5 % Narwhal	
+<5 % Walrus	
+
+in percent contribution to FA signature (Galicia et al 2015).
+
+Another study in Baffin Bay from 1999-2004 reported:
+
+25-33 % Beluga whales
+65 % Ringed seals
+8 % Bearded seals
+5 % Harbor seals
+
+also in percent contribution to FA signature (Thiemann et al 2008).
+
+From these studies it seems like the bears in general eat very little narwhal and walrus. In Baffin Bay, contrary to East Greenland, bears eat beluga and don't eat hooded seal. The main dietary items in Baffin seem to be ringed seal and beluga whale, and then a lower % of harp seal (taking into account there is no harp seal in Thieman et al 2008) and bearded seal. They seem to occasionally eat narwhal, walrus and harbor seal.
+
+For my models, I used the diet in McKinney et al (excluding hooded seals) and did some adjustments like including Arctic char and seabirds, as seabird eggs are known to be important for polar bear diet, and considering some of the % from fatty acid study in Baffin Bay by Galicia et al 2015. Then I added beluga as an import and will let ecopath adjust all other % based on that.
+
+
+**Energetics - E**: 
+
+I used the same a as for phocids, so a = 200. 
+
+Pagano et al 2018 measured FMRs in polar bears. Their sample included free ranging female polar bears (n = 9) during April 2014–2016 from the Beaufort Sea over 8 to 11 days each year using doubly labeled water (DLW).
+Their results averaged 1.6 times previously assumed values for polar bears (SE = 0.1, range = 1.0 to 2.6). Daily FMRs measured over 8 to 11 days, averaged 0.45 ml CO2 g−1 h−1 (SE = 0.04, n = 9 bears), which converts to 51.6 MJ day−1 (SE = 6.2, n =9 bears) or 12,324.7 kcal day−1. These values ranged from 0.6 to 1.1 times predicted FMRs [mean ("x) = 0.8, SE = 0.1] for similarly sized marine and terrestrial mammalian carnivores.
+
+
+Pagano and Williams studied energy expenditure of polar bears and also report field metabolic rates of different age bears with different body mass in free‐ranging subadult and adult female polar bears without dependent young, on the sea ice of the Beaufort Sea. This is the same, but shortened sample as in Pagano et al 2018 included 6 bears from 3 to 22 years old, although only 1 above 6 years old. FMR from two methods used (derived from doubly labeled water DLW and from accelerometer-based relationships ACC) varied between 214.1 - 402.1 (mean 313.55) kJ/Kg/day for DWL and 155.1 - 282.7 (mean 222.02) kJ/Kg/da for ACC. The mean mass varied from 133.6 to 209.1 kg. 
+
+
+
+```{r}
+
+# 320 for otariids, 200 for phocids, 192 for mysticetes, 317 for odontocetes, 320 for sea otters
+
+E_PB <- 200*(weight_PB^0.75) 
+E_PB
+
+#Newer equation from Williamns et al 2020 - considering polar bears terrestrial carnivores; weight in kg resulting in KJ per day
+
+E_PB_Williams <- 684.5*(weight_PB^0.8)
+
+#Based on Pagano et al 2018
+
+E_PB_Pagano <- 12324.7
+
+  
+```
+
+
+**Q/B**:  
+
+To calculate Q (consumption per individual), I first need to convert kcal/day to ton of food per year. For that, I need to know how many ton of bear food items correspond to these many kcal.   
+
+
+
+```{r}
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_PB_kJ_year <- E_PB*4.186*365 #energy requirements of one polar bear per year
+E_PB_kJ_year
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 66.88 % ringed seal; 2.55 % walrus; 28.03 % Other seals; 2.55 % narwhal
+#all marine mammals
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+# Energy content of one ringed seal is appr. 600 MJ, while bearded seal is 3700 MJ (Pagano et al 2018). If one ringed seal weights 73.795 kg and one bearded seal weights 200 kg
+
+energy_seal_KJ_ton <- ((600*1000*1000/73.795) + (3700*1000*1000/200))/2 #energy in kJ per ton of ringed and bearded seal averaged
+
+
+marine_mammals_ton_year_PB <-E_PB_kJ_year/energy_seal_KJ_ton 
+
+
+#When summing these I get the consumption per year of one polar bear. Need to multiply by the abundance of polar bear to get consumption for polar bear per km2
+
+Q_PB_ton_year <- marine_mammals_ton_year_PB 
+
+QB_PB <- Q_PB_ton_year*(Abundance_PB)/Biomass_PB
+QB_PB 
+
+
+##########################################################################################
+#Using Williams et al 2020 equation #####################################################
+#######################################################################################
+
+
+E_PB_kJ_year_Williams <- E_PB_Williams*365 #energy requirements of one polar bear per year
+E_PB_kJ_year_Williams
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 66.88 % ringed seal; 2.55 % walrus; 28.03 % Other seals; 2.55 % narwhal
+#all marine mammals
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+# Energy content of one ringed seal is appr. 600 MJ, while bearded seal is 3700 MJ (Pagano et al 2018). If one ringed seal weights 73.795 kg and one bearded seal weights 200 kg
+
+energy_seal_KJ_ton <- ((600*1000*1000/73.795) + (3700*1000*1000/200))/2 #energy in kJ per ton of ringed and bearded seal averaged
+
+
+Q_PB_ton_year_Williams <-E_PB_kJ_year_Williams/energy_seal_KJ_ton 
+
+
+#When summing these I get the consumption per year of one polar bear. Need to multiply by the abundance of polar bear to get consumption for polar bear per km2
+
+QB_PB_Williams <- Q_PB_ton_year_Williams*(Abundance_PB)/Biomass_PB
+QB_PB_Williams 
+
+
+##########################################################################################
+#Pagano et al 2018 Science #####################################################
+#######################################################################################
+
+
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_PB_kJ_year_Pagano <- E_PB_Pagano*4.186*365 #energy requirements of one polar bear per year
+E_PB_kJ_year_Pagano
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 66.88 % ringed seal; 2.55 % walrus; 28.03 % Other seals; 2.55 % narwhal
+#all marine mammals
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+# Energy content of one ringed seal is appr. 600 MJ, while bearded seal is 3700 MJ (Pagano et al 2018). If one ringed seal weights 73.795 kg and one bearded seal weights 200 kg
+
+energy_seal_KJ_ton <- ((600*1000*1000/73.795) + (3700*1000*1000/200))/2 #energy in kJ per ton of ringed and bearded seal averaged
+
+
+Q_PB_ton_year_Pagano <-E_PB_kJ_year_Pagano/energy_seal_KJ_ton 
+
+QB_PB_Pagano <- Q_PB_ton_year_Pagano*(Abundance_PB)/Biomass_PB
+QB_PB_Pagano 
+
+
+```
+
+
+
+### Narwhal
+
+#### Migration patterns
+
+
+**Weigth**:  
+
+The average weight of narwhal was calculated as 325 kg based on mean mass of females of 262 kg and males of 388 kg in Titres and Pauly 1998 (estimated from the regression with maximum body length). Yet, this value seems very low given narwhal adults can ranged 800 to 1,600 kg. The average was 1300 kg according to Heide-Jørgensen (2002) and Janjua et al (2015) considered a mean body mass of 874 kg in the stock based on Laidre et al. 2004.
+
+**Abundance**: 
+
+Abundance estimated from NAMMCO et al 2018, based on Doniol-Valcroze [1] for the Eastern Baffin Bay stock in 2013 was 17 555 +/- 0.35 individuals. The distribution of the East-Baffin Bay narwhal stock in the summer (roughly from June-September) is completely within the model area, close to the fjords. So I am considering the model area when calculating their abundance.
+
+In the winter, this narwhal population is in southern Baffin Bay and Davis Strait.
+
+In the fall and spring this stock may mix with other narwhals from other stocks that pass by the area during their migrations up and down from summer to winter grounds (so it is likely that there are more narwhals in the area during these months).
+
+
+```{r}
+
+Abundance_narwhal <- 17555/81447.25 
+Abundance_narwhal
+
+
+```
+
+
+**Biomass**: 
+
+Calculated based on (weight_kg/1000)*abundance.
+
+
+```{r}
+
+Biomass_narwhal_all_pop <- 874/1000*Abundance_narwhal
+
+# The biomass of the whole stock in the model area in summer is 0.047 ton/km2
+
+Biomass_narwhal <- (874/1000*Abundance_narwhal)*(1/4)   
+Biomass_narwhal
+
+#I am considering the number of narwhal in the fjords to be 17,555 in the summer and assuming they are not in the model area in the winter
+
+```
+
+
+**Landings**: 
+
+The East Baffin summering stock is harvested by hunters in Clyde River and Qikiqtarjuaq. Yet, the communities hunt primarily in autumn when narwhal from other stocks are migrating along the Baffin Island coastline making it difficult to know which stock is being harvested. Although recent catch levels appear to have been sustainable and relatively constant (97 to 183 landed, 2000-2015), there is considerable uncertainty about stock structure (NAMMCO 2018). 
+
+I used the annual harvest based on Table 1 of Anex 26 in NAMMCO 2018. These seem quite stable over the past 10 years, so I used the value for the year 2013, corresponding to the most recent year that we have narwhal abundance for. 
+
+**Fishing mortality**: 0.0075 /year
+
+Fishing mortality = (landings_ind_year*weight_ton/area)/biomass
+
+The area I used was the same to calculate biomass (53 510 km2), as this one was the area surveyed to calculate abundance for the East Baffin Bay stock. I calculated this based on biomass for the whole stock and not for the model area.
+
+```{r}
+
+fishing_narwhal <- (132*(874/1000/81447.25))/Biomass_narwhal_all_pop
+fishing_narwhal
+
+#harvest ton/km2
+harvest_narwhal <- 132*(874/1000/81447.25)
+harvest_narwhal
+
+```
+
+
+
+**P/B**: 
+
+
+Life span for narwhal is 115 years (Garde et al 2015).
+
+
+```{r}
+
+mortality_narwhal <- 0.0236 #this value was calculated in the Mortality_calculations_marine_mammals spreadsheet, but not adjusted for migration yet
+PB_narwhal <- fishing_narwhal + mortality_narwhal
+PB_narwhal
+
+```
+
+
+
+**Diet composition**: 56.38 % Arctic/polar cod; 36.60 % Greenland halibut; 1 % Small demersal fish; 6.92 % Cephalopods; 1 % Large crustaceans (+ 25% import)
+
+According to Courtney Watt-Wheeler from DFO, most of narwhal's energy is uptaken in their foraging grounds in the winter, feeding on Greenland halibut (also in Laidre et al 2004). I will consider ~ 25 % of their diet as import, and lower feeding on their major prey - Arctic cod and halibut.
+
+More detailed:
+
+50.45% *Boreogadus saida*; 5.93% *Arctogadus glacialis*;36.60% *Reinhardtius hippoglossoides* (Greenland halibut);< 0.05% *Liparis* spp. (seasnail); 6.92% *Gonatus fabricci*; < 0.05% Pelagic crustaceans (decapods and mysids) 
+
+
+Based on Finley et al 1982, Can. J. of Zool. There are more recent dietary studies but this was the only one that quantified the diet in wet weight contribution. This study has diet for narwhals in summer (June to September) in Pond Inlet, Baffin Island, in open water, ice crack and ice edge in 1978-79. The final diet is the average regions and the two years. I assumed 0.05% ww contribution for the species groups that were < 1 % (Liparis and Crustaceans).
+
+
+From Laidre and Heide-Jorgensen 2005 (% occurrence); most common prey:
+
+Pond Inlet/Eclipse Sound in summer:
+0 % stomachs with fresh remains (indicates recent feeding)
+13 % Arctic/polar cod
+25 % Gonatus fabricci
+
+Uummanaaq in fall:
+100 % stomachs with fresh remains
+100 % Gonatus fabricci
+
+Disko Bay in winter:
+96 % 
+51 % halibut
+2 % Arctic/polar cod
+73 % Gonatus fabricci
+20 % pandalus
+
+
+
+**Energetics - E**:  
+
+Narwhal is an odontocete, so a = 317.
+
+Laidre et al 2004 developed a bioenergetic model for narwhal in their wintering grounds (estimated to be about five months). Predicted relative daily food requirements were highest for young animals (6% and 5% of body mass for immature males and females, respectively) and lowest for adults (3-4% of body mass). The bioenergetic model produced a daily sub-population energy requirement for the northern wintering ground range (NWG) (45 000 whales) of 19 x 10^8 kcal/day (s.e. 7 x 10^8).
+The adult female portion of the population had the highest energy requirements, 8 x 10^8 kcal/day (s.e. 3 x 10^8), with adult male stage class following them at 6 x 10^8 kcal/day (s.e. 2.5 x 10^8). Model simulations for the sub-populations occupying the southern wintering ground range (SWG) (5000 whales) resulted in a population caloric requirement of 2.4 x 10^8 kcal/day  (s.e. 1.1 x 10^8 kcal/day).
+
+The Baffin subpopulation spends winter in northern Davis Strait - southern Baffin Bay, so I will consider the energetics for the subpopulations occupying the SWG in Laidre et al (although Laidre refers that these are the subpopulations from Melville Bay, West Greenland, and Eclipse Sound, Canada).
+
+
+```{r}
+
+E_narwhal <- 317*(874^0.75)
+E_narwhal
+  
+E_narwhal_Laidre <- 2.4*(10^8)/5000
+E_narwhal_Laidre_se <- 1.1*(10^8)/5000
+  
+```
+
+
+**Q/B**: 
+
+To calculate Q (consumption per individual), I first need to convert kcal/day to ton of food per year. For that, I need to know how many ton of narwhal food items correspond to these many kcal. 
+
+
+```{r}
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_narwhal_kJ_year <- E_narwhal*4.186*365 #energy requirements of one narwhal
+E_narwhal_kJ_year
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 35 % Arctic/polar cod; 25 % Greenland halibut; 2 % flounders; 5 % Other small demersal fish; 5 % sculpins; 2 % Redfish; 2 % Skates; 10 % Cephalopods; 1 % Other marine fish; 7.5 % Carnivorous zooplankton; 5.5 % Euphausiids/Mysids 
+#Of each dietary item these are the % contributions to the yearly requirements of narwhal in kJ
+
+cod_kJ_year <- (35 + 5 + 2 + 2 +1)/100*E_narwhal_kJ_year
+halibut_kJ_year <- (25 +2)/100*E_narwhal_kJ_year
+snailfish_kJ_year <- (5/100)*E_narwhal_kJ_year
+squid_kJ_year <- (10/100)*E_narwhal_kJ_year
+crustaceans_kJ_year <- (7.5+5.5)/100*E_narwhal_kJ_year
+
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+cod_ton_year <- cod_kJ_year/(4.5*1e+06)
+halibut_ton_year <- halibut_kJ_year/(5.5*1e+06) 
+snailfish_ton_year <- snailfish_kJ_year/(4*1e+06)
+squid_ton_year <- squid_kJ_year/(6.9*1e+06)
+crustaceans_ton_year <- crustaceans_kJ_year/(4*1e+06) 
+
+#When summing these I get the consumption per year of one narwhal. Need to multiply by the abundance of narwhal to get consumption for narwhal per km2
+
+# APROACH 1
+
+#Assuming a 75 % assimilation rate - the narwhal needs to eat an extra 25 % tons of fish/invertebrates to get the same caloric requirements
+
+Q_narwhal_ton_year_1 <- cod_ton_year+halibut_ton_year+snailfish_ton_year+squid_ton_year+crustaceans_ton_year + (cod_ton_year+halibut_ton_year+snailfish_ton_year+squid_ton_year+crustaceans_ton_year)*0.25
+
+QB_narwhal_1 <- Q_narwhal_ton_year_1*Abundance_narwhal/Biomass_narwhal_all_pop
+QB_narwhal_1 
+
+
+# APROACH 2
+
+#Assuming a 100 % assimilation rate for the most energetic dietary item - cod in this case
+
+Q_narwhal_ton_year_2 <- cod_ton_year+halibut_ton_year+snailfish_ton_year+squid_ton_year+crustaceans_ton_year + (halibut_ton_year+snailfish_ton_year+squid_ton_year+crustaceans_ton_year)*0.25
+
+QB_narwhal_2 <- Q_narwhal_ton_year_2*Abundance_narwhal/Biomass_narwhal_all_pop
+QB_narwhal_2 
+
+# APROACH 3
+#Assuming a 100 % assimilation rate for the least energetic dietary items - snailfish and crustaceans in this case
+
+Q_narwhal_ton_year_3 <- cod_ton_year+halibut_ton_year+snailfish_ton_year+squid_ton_year+crustaceans_ton_year + (halibut_ton_year+cod_ton_year+squid_ton_year)*0.25
+
+QB_narwhal_3 <- Q_narwhal_ton_year_3*Abundance_narwhal/Biomass_narwhal_all_pop
+QB_narwhal_3 
+
+#Average the three approaches
+
+QB_narwhal <- (QB_narwhal_1 + QB_narwhal_2 + QB_narwhal_3)/3
+QB_narwhal #Consumption over biomass of the stock for a full year
+
+
+QB_narwhal 
+
+##########################################################################################
+#Based on Laidre et al 2004 #############################################################
+##########################################################################################
+
+
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_narwhal_kJ_year_Laidre <- E_narwhal_Laidre*4.186*365 #energy requirements of one narwhal per year
+E_narwhal_kJ_year_Laidre
+
+E_narwhal_kJ_year_Laidre_se <- E_narwhal_Laidre_se*4.186*365 #energy requirements of one narwhal per year
+E_narwhal_kJ_year_Laidre_se
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 56.38 % Arctic/polar cod; 36.60 % Greenland halibut; 1 % Small demersal fish; 6.92 % Cephalopods; 1 % Large crustaceans
+#Of each dietary item these are the % contributions to the yearly requirements of narwhal in kJ
+#I will consider that all fish have about 5 kJ/g
+
+fish_kJ_ton <- 5*1e+06
+
+
+Q_KW_ton_year_Laidre <- E_narwhal_kJ_year_Laidre/fish_kJ_ton 
+Q_KW_ton_year_Laidre_se <- E_narwhal_kJ_year_Laidre_se/fish_kJ_ton 
+
+
+#When summing these I get the consumption per year of one narwhal. Need to multiply by the abundance of narwhal to get consumption for narwhal per km2
+
+#Assuming a 82 % assimilation efficiency as for captive killer whales on a fish diet
+
+Q_narwhal_ton_year_Laidre <- Q_KW_ton_year_Laidre + (Q_KW_ton_year_Laidre)*0.18
+Q_narwhal_ton_year_Laidre_se <- Q_KW_ton_year_Laidre_se + (Q_KW_ton_year_Laidre_se)*0.18
+
+QB_narwhal_Laidre <- Q_narwhal_ton_year_Laidre*Abundance_narwhal/Biomass_narwhal_all_pop
+QB_narwhal_Laidre
+
+QB_narwhal_Laidre_se <- Q_narwhal_ton_year_Laidre_se*Abundance_narwhal/Biomass_narwhal_all_pop
+QB_narwhal_Laidre_se
+
+```
+
+
+
+### Bowhead whale
+
+
+**Weigth**: 31,075.5 kg 
+
+Average weight for females is 30 745 kg and for males is 31 406 kg based on Titres and Pauly 1998 (estimated from the regression with maximum body length).  
+
+
+```{r}
+
+weight_BW <- (30745 + 31406)/2
+weight_BW
+
+```
+
+
+
+**Abundance**:  
+
+
+Eastern Canada-West Greenland population stock size of about 6344 individuals in 590,000 km² area of occupancy, and 1,082,550 km² extent of occupancy (COSEWIC. 2009). Yet, this value in COSEWIC 2009 (in the tables in the appendix of the SAMBR report) was estimated as 6,745 with a CV of 0.22. 
+
+
+```{r}
+
+Abundance_BW <- 6344/1082550 
+Abundance_BW
+
+
+```
+
+
+
+**Biomass**:
+
+The abundance estimate is for the whole bowhead whale stock. Yet, bowhead are in the model area mostly in the summer, and in the winter they go to other areas.
+
+Calculated based on (weight_kg/1000)*abundance.
+
+
+```{r}
+Biomass_BW_all_pop <- weight_BW/1000*Abundance_BW
+
+Biomass_BW <- weight_BW/1000*Abundance_BW/4 # I am considering the population in the model area only in the summer
+Biomass_BW 
+
+```
+
+
+**Landings**: 
+
+The EC-WG bowhead whale population can support a total human-induced mortality of 52 whales annually resulting from all sources of anthropogenic mortality (e.g., harvest, struck and loss, net entanglements, ship collisions) (DFO, 2015).
+
+The subsistence hunts recorded for Nunavut and Nunavik more recently, from 2008-2014, have been 2-3 whales per year ([1])DFO, 2015).
+
+
+**Fishing mortality**: 
+
+(landings_ind_year*weight_ton/area)/biomass
+
+I calculated the fishing mortality for the whole stock, so biomass here is for the whole stock and not the biomass for the model area.
+
+
+```{r}
+
+fishing_BW <- (2*(weight_BW/1000/1082550))/(weight_BW/1000*(6344/1082550))
+fishing_BW
+
+#harvest bowhead whale ton/km2
+harvest_BW <- 2*(weight_BW/1000/1082550)
+harvest_BW
+
+```
+
+
+
+**P/B**: 
+
+Growth appears faster for females than males, and age at sexual maturity (age at length 12–13 m for males and 13–13.5 m for females) occurs at around 25 years of age. Growth slows markedly for both sexes at roughly 40–50 years of age. Life span for bowhead whale is about 200 years (George et al (1999))
+
+```{r}
+
+mortality_BW <- 0.0131  #this value was calculated in the Mortality_calculations_marine_mammals spreadsheet 
+PB_BW <- fishing_BW + mortality_BW
+PB_BW
+
+```
+
+
+
+**Diet composition**: 14.79 % Omnivorous zooplankton; 47.62 % Carnivorous zooplankton; 6.97 % Calanus; 30.61 % Euphausiids (import)
+
+More detailed:
+7.82 % *Mysis oculata* (Omnivorous); 41.5 % Chaetognaths/Conchoecinae (Carnivorous); 30.61 % Euphausiids/*Paraeuchaeta spp* (Carnivorous); 6.12 % *A. glacialis*/*T.libellula* (Carnivorous); 4.76 % *Calanus spp*/*L.helicina* (Calanus/Omnivorous); 9.18 % *Calanus spp*/*M.longa* (Calanus/Omnivorous)
+
+Diet composition was estimated for bowhead whales in several regions of the Canadian Arctic, including Baffin Bay, using SI mixing models. An hierarchical cluster analysis of bowhead whale isotopic signatures segregated bowhead whales into 4 groups, all of which were approximately composed of equal number of males and females. There was also no clear pattern in the distribution of individuals from specific sites, years or age classes among the clusters, indicating that none of the groups were dominated by individuals from a particular site, year or age class (Pomerleau et al (2012)) 
+
+Groups 1 and 3 consumed primarily a mixture of euphausiids, mysids, Paraeuchaeta spp. and chaetognaths, but the contribution of the different species was different between the 2 groups. Bowhead whales from Groups 2 and 4 consumed a large amount of calanoid copepods (Calanus spp. [here and hereafter comprised of C. hyperboreus and C. glacialis] and Metridia longa), but individuals from Group 2 also consumed various amounts of amphipods, pteropods and chaetognaths. Bowhead whales in Group 4 consumed the largest amount of euphausiids.
+
+Attention! This diet is not in wet weight % and is not based on stomach contents so may not be very accurate for the models. Also, it is likely that bowhead feed to a larger extent on calanoid copepods in the region during summer since they are more abundant.
+
+
+**Energetics - E**:
+
+Bowhead whale is a mysticete so a = 192. 
+
+
+In Laidre et al 2007: Studies of the movements of bowhead whales from satellite telemetry show intense and localized use of a single site for 3 to 6 wk interspersed with long distance movements (>1000 km) occurring over 1 to 2 wk (Heide-Jørgensen et al. 2006). Travel speeds are too high (up to 200 km d–1) for foraging to be feasible during these long distance movements, and whales traverse off-shore deep areas, regions that contain little to no zooplankton. Thus, it is possible that bowhead whale caloric needs are not met on a daily basis; instead, they are obtained during intense foraging periods with little to no feeding between sites.
+
+The bioenergetic model produced a daily energy requirement of 2.67 × 10^8 kcal d–1 (SE = 9.7 × 10^5) for the 250 (CV = 0.35) bowhead whales in Disko Bay. Daily energetic needs of the population were met with approximately 223 t (SE = 0.8) of zooplankton. Thus, the estimated biomass of zooplankton required by the total population of bowheads over the 4 mo period was 26798 t (SE = 97).
+
+Banas et al 2021 reports that annual Calanus consumption by bowhead whales in Disko Bay is similar to median estimates of consumption by each of three zooplankton taxa (jellies, chaetognaths, and predatory copepods), and much greater than the median estimate of consumption by fish larvae, as derived from seasonal abundance and specific ingestion rates from the literature. They're annual grazing on copepods in Disko Bay was calculated as 0.90– 2.8 g C m−2 yr−1.
+
+
+```{r}
+
+E_BW <- 192*(weight_BW^0.75)
+E_BW
+  
+E_BW_Laidre <- 1.1 * 10^6 #based on Laidre 2007 and adapted for a model in Banas et al 2021 (assuming 80% adult female; 10% adult male; 10% juveniles) in a 4-month period in Disko Bay and a copepod-based diet
+  
+
+```
+
+
+**Q/B**: 
+
+To calculate Q (consumption per individual), I first need to convert kcal/day to ton of food per year. For that, I need to know how many ton of narwhal food items correspond to these many kcal. 
+
+
+```{r}
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_BW_kJ_year <- E_BW*4.186*365 #energy requirements of one whale per year
+E_BW_kJ_year
+
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 12.8 % Omnivorous zooplankton; 49.9 % Carnivorous zooplankton; 12 % Calanus; 25.3 % Euphausiids/Mysids
+
+#Of each dietary item these are the % contributions to the yearly requirements in kJ
+
+euphausiids_kJ_year_BW <- (25.3/100)*E_BW_kJ_year 
+copepods_kJ_year_BW <- (12 + 12.8)/100*E_BW_kJ_year
+chaetognaths_kJ_year_BW <- (49.9/100)*E_BW_kJ_year
+
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+euphausiids_ton_year_BW <- euphausiids_kJ_year_BW/(3.73*1e+06) 
+copepods_ton_year_BW <- copepods_kJ_year_BW/(3.80*1e+06)
+chaetognaths_ton_year_BW <- chaetognaths_kJ_year_BW/(2.42*1e+06) 
+
+
+#When summing these I get the consumption per year of one bowhead. Need to multiply by the abundance of bowhead to get consumption for bowhead per km2
+
+# APROACH 1
+
+#Assuming a 75 % assimilation rate - the whale needs to eat an extra 25 % tons of fish/invertebrates to get the same caloric requirements
+
+Q_BW_ton_year_1 <- euphausiids_ton_year_BW++copepods_ton_year_BW+chaetognaths_ton_year_BW + (euphausiids_ton_year_BW+copepods_ton_year_BW+chaetognaths_ton_year_BW )*0.25
+
+QB_BW_1 <- Q_BW_ton_year_1*Abundance_BW/Biomass_BW_all_pop
+QB_BW_1 
+
+# APROACH 2
+
+#Assuming a 100 % assimilation rate for copepods and euphausiids 
+
+Q_BW_ton_year_2 <- euphausiids_ton_year_BW+copepods_ton_year_BW+chaetognaths_ton_year_BW + (chaetognaths_ton_year_BW )*0.25
+
+QB_BW_2 <- Q_BW_ton_year_2*Abundance_BW/Biomass_BW_all_pop
+QB_BW_2 
+
+
+# APROACH 3
+#Assuming a 100 % assimilation rate for chaetognaths
+
+Q_BW_ton_year_3 <- euphausiids_ton_year_BW+copepods_ton_year_BW+chaetognaths_ton_year_BW + (euphausiids_ton_year_BW+copepods_ton_year_BW )*0.25
+
+QB_BW_3 <- Q_BW_ton_year_3*Abundance_BW/Biomass_BW_all_pop
+QB_BW_3 
+
+
+#Average the three approaches
+
+QB_BW <- (QB_BW_1 + QB_BW_2 + QB_BW_3)/3
+QB_BW
+
+##############################################################################################
+#Based on Laidre et al 2007 & Banas et al 2021##########################################
+############################################################################################
+
+
+E_BW_kJ_summer_Laidre <- E_BW_Laidre*4.186*365 #energy requirements of one whale in summer (Disko Bay)
+E_BW_kJ_summer_Laidre
+
+#Considering just copepods in their diet
+
+
+Q_BW_ton_summer_Laidre <- E_BW_kJ_summer_Laidre/(3.80*1e+06)
+
+QB_BW_summer_Laidre <- Q_BW_ton_summer_Laidre*Abundance_BW/Biomass_BW_all_pop 
+QB_BW_summer_Laidre 
+
+
+   
+```
+
+
+### Ringed seal
+
+**Weigth**:  
+
+Ringed seals in northern Arctic regions tend to be larger than those in more southern areas of the Canadian Arctic, such as Hudson Bay. This may be because seals in the High Arctic endure longer periods of negative energy balance and having larger body size allows for greater relative fat storage. Ferguson et al 2018 estimated males to be 125.8 cm and females 126.4 cm long in Hudson Bay, and males to be 140.1 cm and females 148.8 cm in the northern region of the Canadian eastern Arctic.The corresponding average weight of ringed seal was 69.3 kg for males and 88 kg for females in the northern region of the Canadian eastern Arctic (Ferguson et al (2018)). 
+
+I calculated the corresponding weight for Hudson Bay based on these values to be 62.23 kg for males and 74.45 kg for females. To calculate the mean weight for Baffin Bay I averaged males and females in both regions:
+
+```{r}
+
+weight_RS <- (88+69.3+74.45+62.23)/4
+weight_RS
+
+```
+
+
+
+**Abundance**: 
+
+Kingsley 1998 calculated seal abundance for Baffin Bay based on polar bears and their energetic needs, through a predator-prey relationship model. The author used both abundance estimates for polar bear (4,025 individuals) and for ringed seal available for the area. They estimate that 1.2 million ringed seals are needed in Baffin Bay -689,000 km² - and associated waters (Kane Basin, Jones Sound, eastern Lancaster Sound - 110,000 km2- and Ungava Bay - 50,000 km2- and eastern Hudson Strait) to sustain the polar bear population.
+
+For my models, I tried to look at the density estimates for West Baffin Bay areas from the Table 4 in this study referring the study by Miller et al. (1982), i.e. 1.3 seals/km2. 
+
+I also looked at Reeves 1998 that summarizes density estimates for ringed seal in several areas: "Using density estimates calculated separately for three ice types - fjord (1.72/km2), coastal shelf (1.31/km2) and pack ice (1.39/km2) - Finley et al. (1983) estimated that there were at least 67,000 seals in the 24,000 km2 of fast ice between Cape Dyer and Navy Board Inlet and 417,000 in the Baffin Bay pack ice (300,000 km2) during late June and early July 1979."
+
+I averaged all these density values previously obtained:
+
+
+```{r}
+
+ab_1 <- 1200000/(689000+110000+50000)
+
+Abundance_ringedseal <- (1.72+1.31+1.39+1.41)/4
+Abundance_ringedseal
+
+
+
+```
+
+
+**Biomass**:
+
+Calculated based on (weight_kg/1000)*abundance.
+
+
+```{r}
+
+Biomass_ringedseal <- weight_RS/1000*Abundance_ringedseal
+Biomass_ringedseal
+
+```
+
+
+**Landings**: 
+
+Pond Inlet and Clyde River secured catches in 1979, based on monthly game calendars kept by hunters, supplemented by recall surveys, of 2,487 and 4,733, respectively (Finley and Miller 1980).
+
+The estimated annual catches of ringed seals in 1981-83 were 4,590 for Qik, 1,887 for Iqaluit and 4,937 for Pangnirtung (Stewart et al. 1986). An additional 1,051 seals to account for the takes at outpost camps (from BRIA 1983, assuming all to have been ringed seals) would give a total secured catch of some 12,465 per year in this region (Reeves et al (1998)).
+
+
+The Nunavut wildlife harvest study compiled seal harvest information for several communities from June 1996 to May 2001 (Priest and Usher 2004). For Clyde River, the average was 2004 ringed seals; for Pond Inlet the average was 2113 ringed seals; and for Qikiqtarjuaq the harvest for these years averaged 2950 ringed seals. Considering only half the seals caught in Pond Inlet, this totals 6,010.5.
+
+
+**Fishing mortality**: 
+
+I divided by the area of my model - 81,447.25 km2, assuming the hunters get ringed seal close to their communities and within the study area.
+
+
+```{r}
+
+fishing_ringedseal <- (6010.5*(weight_RS/1000/81447.25))/Biomass_ringedseal 
+fishing_ringedseal
+
+fishing_ringedseal_2 <- 100000*(weight_RS/1000/(689000+110000+50000))/Biomass_ringedseal #this yields a higher mortality rate from hunting, but approximate
+
+#harvest in ton/km2
+harvest_ringedseal <- 100000*(weight_RS/1000/(689000+110000+50000))
+harvest_ringedseal
+
+
+```
+
+
+
+**P/B**: 
+
+Life span for ringed seal is 43 years for females and 38 for males (Ferguson et al (2018)). I did the calculations based on 43 years of females as a maximum life expectancy.
+
+
+```{r}
+
+mortality_ringedseal <-  0.0647 #this value was calculated in the Mortality_calculations_marine_mammals spreadsheet
+PB_ringedseal <- fishing_ringedseal_2 + mortality_ringedseal
+PB_ringedseal
+
+```
+
+
+
+**Diet composition**: 31 % Carnivorous zooplankton; 2.55 % Omnivorous zooplankton; 50.45 % Arctic/polar cod; 10 % Sculpins/Eelpouts; 6 % Large crustaceans
+
+More detailed:
+
+30.95 % *Themisto libellula* (Carnivorous); 0.3 %  *Gammarus setosus* (Omnivorous); 1.75 % *Onisimus litoralis* (Omnivorous); 0.3 % *Atylus carinatus* (Omnivorous); 0.1 % *Gammaracanthus loricatus* (Omnivorous); 0.05 % *Hyperia galba* (Carnivorous); 0.05 % *Mysis oculata* (Omnivorous); 0.05 % *Lebbeus polari* (Omnivorous); 20.2 % *Boreogadus saida*; 45.25 *Arctogadus glacialis*; 0.35 % *Gymnocanthus tricuspis*; 0.65 % *Myoxocephalus quadricornis*
+
+
+Based on diet of ringed seals in east and west sides of the North Water Polynia, Northern Baffin Bay (Holts et al (2001)). From May to July 1998, stomach and muscle tissue samples were collected from 99 ringed seals taken near Grise Fiord and 100 taken near Qaanaaq. 
+
+I used this diet because it reported frequency of occurrence by biomass. Yurkowski et al 2016 also reported ringed seal diet near the study area - near Pangnirtung - but only reported % diet contribution. 
+Yet, in this study by Yurkowski the % diet contribution of Arctic cod to their diet varies regionally and with life stage, and it's higher in more northern regions - 19-54 % in subadults and 28-87 % in adults. To decrease predation pressure in Arctic cod, I will bring it down to 50 % and increase predation on sculpins and shrimp
+
+I will also add some other items to the diet based on presence in ringed seal stomachs (and to decrease pressure on Arctic cod) - shrimps 
+
+
+
+**Energetics - E**: 
+
+Ringed seal is a phocid, so a = 200.
+
+Assimilation efficiency for ringed seal was studied using two captive ringed seal in Lawson et al 1997. It varies depending on food type from 83.2 (for redfish) to 93.9 (for Atlantic herring) %, with an average of 90.5 (5.00 SD) %. For Arctic cod, the AE was 88.3 (1.33 SD) %. 
+In the discussion, the authors refer that other published estimates of herring digestibility of dry matter by pinnipeds are similar: 90.0% for northern fur seals (Callorhinus ursinus; Fadely et al. 1990), 91% for harp seals (Lawson et al. 1997), and 91.2% for harbour seals (Phoca vitulina; Ashwell-Erickson and Elsner 1981).
+
+Ochoa-Acuña et al 2008 estimated digestible energy intake of two ringed seals as 13 MJ/day averaging all seasons (this value accounts for assimilation efficiency in Lawson). 
+
+
+```{r}
+
+E_ringedseal <- 200*(weight_RS^0.75)
+E_ringedseal
+
+#According to Ochoa-Acuña et al 2008
+
+E_ringedseal_Ochoa <- 13000 # KJ/day
+  
+  
+```
+
+
+**Q/B**: 
+
+
+To calculate Q (consumption per individual), I first need to convert kcal/day to ton of food per year. For that, I need to know how many ton of ringed seal food items correspond to these many kcal. 
+
+
+```{r}
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_ringedseal_kJ_year <- E_ringedseal*4.186*365 #energy requirements of one ringed seal per year
+E_ringedseal_kJ_year
+
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 31 % Carnivorous zooplankton; 2.55 % Omnivorous zooplankton; 50.45 % Arctic/polar cod; 10 % Sculpins/Eelpouts; 6 % Large crustaceans
+#Of each dietary item these are the % contributions to the yearly requirements of ringed seal in kJ
+
+crustaceans_kJ_year_RS <- (31 + 2.55 + 6)/100*E_ringedseal_kJ_year 
+cod_kJ_year_RS <- (50.45 + 1)/100*E_ringedseal_kJ_year
+sculpin_kJ_year_RS <- (10)/100*E_ringedseal_kJ_year
+
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+crustaceans_ton_year_RS <- crustaceans_kJ_year_RS/(4*1e+06) 
+cod_ton_year_RS <- cod_kJ_year_RS/(4.5*1e+06)
+sculpin_ton_year_RS <- sculpin_kJ_year_RS/(4.155*1e+06) 
+
+
+
+#When summing these I get the consumption per year of one seal. Need to multiply by the abundance of seals to get consumption for  seal per km2
+
+# APROACH 1
+
+#Assuming a 75 % assimilation rate - the narwhal needs to eat an extra 25 % tons of fish/invertebrates to get the same caloric requirements
+
+Q_ringedseal_ton_year_1 <- crustaceans_ton_year_RS+cod_ton_year_RS+sculpin_ton_year_RS + (crustaceans_ton_year_RS+cod_ton_year_RS+sculpin_ton_year_RS)*0.25
+
+QB_ringedseal_1 <- Q_ringedseal_ton_year_1*Abundance_ringedseal/Biomass_ringedseal
+QB_ringedseal_1 
+
+# APROACH 2
+
+#Assuming a 100 % assimilation rate for the most energetic dietary item - cod in this case
+
+Q_ringedseal_ton_year_2 <- crustaceans_ton_year_RS+cod_ton_year_RS+sculpin_ton_year_RS + (crustaceans_ton_year_RS+sculpin_ton_year_RS)*0.25
+
+QB_ringedseal_2 <- Q_ringedseal_ton_year_2*Abundance_ringedseal/Biomass_ringedseal
+QB_ringedseal_2 
+
+# APROACH 3
+#Assuming a 100 % assimilation rate for the least energetic dietary items - decapoda and crustaceans in this case
+
+Q_ringedseal_ton_year_3 <- crustaceans_ton_year_RS+cod_ton_year_RS+sculpin_ton_year_RS + (cod_ton_year_RS+sculpin_ton_year_RS)*0.25
+
+QB_ringedseal_3 <- Q_ringedseal_ton_year_3*Abundance_ringedseal/Biomass_ringedseal
+QB_ringedseal_3 
+
+#Average the three approaches
+
+QB_ringedseal <- (QB_ringedseal_1 + QB_ringedseal_2 + QB_ringedseal_3)/3
+QB_ringedseal
+
+##############################################################################################
+#Based on Ochoa (AE already included)#####################################################
+###########################################################################################
+
+
+E_ringedseal_kJ_year_Ochoa <- E_ringedseal_Ochoa*365 #energy requirements of one ringed seal per year
+E_ringedseal_kJ_year_Ochoa
+
+crustaceans_kJ_year_RS_Ochoa <- (31 + 2.55 + 6)/100*E_ringedseal_kJ_year_Ochoa 
+cod_kJ_year_RS_Ochoa <- (50.45 + 1)/100*E_ringedseal_kJ_year_Ochoa
+sculpin_kJ_year_RS_Ochoa <- (10)/100*E_ringedseal_kJ_year_Ochoa
+
+
+crustaceans_ton_year_RS_Ochoa <- crustaceans_kJ_year_RS_Ochoa/(4*1e+06) 
+cod_ton_year_RS_Ochoa <- cod_kJ_year_RS_Ochoa/(4.5*1e+06)
+sculpin_ton_year_RS_Ochoa <- sculpin_kJ_year_RS_Ochoa/(4.155*1e+06) 
+
+
+Q_ringedseal_ton_year_Ochoa <- crustaceans_ton_year_RS_Ochoa+cod_ton_year_RS_Ochoa+sculpin_ton_year_RS_Ochoa
+
+QB_ringedseal_Ochoa <- Q_ringedseal_ton_year_Ochoa*Abundance_ringedseal/Biomass_ringedseal
+QB_ringedseal_Ochoa 
+
+   
+```
+
+
+
+### Other seals (bearded, hooded, harp and harbour)
+
+**Weigth**: 
+
+Bearded seal mean body mass is 200 kg for both males and females.
+Hooded seal mean body mass is 140 kg for males and 109 for females 
+Harp seal mean body mass is 92.2 kg for both males and females.
+(Trites and Pauly, 1998)
+
+
+```{r}
+
+weight_bearded <- 200
+weight_hooded <- (140+109)/2
+weight_harp <- 92.2
+
+av_weight_seals <- (weight_harp+weight_bearded+weight_hooded)/3
+
+```
+
+
+
+
+**Abundance**: 
+
+*Bearded seals* - appear to be present in low densities and restricted in distribution by the extent of pack ice and shallow water. They usually prefer areas of 250 meters deep based on their foraging ecology (Stephenson and Hartwig 2010). 
+The only abundance estimates for bearded seal are for the western Hudson Bay in June 1944-1995 (Lunn et al 1997). The density of bearded seals in 1995 was estimated as 0.024 seals/km2 ice (for an ice area of 83 380 km2 and a population of 1 980 seals). 
+The total population estimates are unkonwn.
+
+From 1958-1979 it was estimated that 190,000 seals occurred in the Canadian waters component, including the Arctic Archipelago, Davis-Baffin and Hudson Bay (Cleator 1996 in SAMBR).
+
+*Hooded seals* - hooded Seal (Crystophora cristata) are pelagic, deep water feeders and found mostly in areas deeper than 200 meter where most foraging occurs (Anderson et al. 2009). 
+
+The total NW Atlantic population has been estimated to consist of approximately 600,000 animals (593,500, SE = 67,200, Hammill and Stenson, 2006). The NE Atlantic population is likely to number between 70,000 and 90,000 animals, although there is considerable uncertainty around these estimates due to paucity of data and limited understanding of the relationships between whelping areas (WGHARP, 2006). The world’s hooded seals belong to a single panmitic genetic population, thereby suggesting that there is some overlap in distribution between the NE Atlantic and the NW Atlantic populations (Andersen et al 2009).
+Hammill and Stenson, 2006 estimated a population size of 593,500 seals in the whole distribution of NW Atlantic hooded seals, and 535,800 in the Front.
+
+Based on wikipedia, Baffin Bay surface area is 689,000 km2. The rest of the Nortwest Atlantic distribution (not counting eastern Greenland) I estimated to be about 2,014,447 on google maps (measuring directly on map). So I divided the abundance estimates for NW Atlantic hooded seal population by these two areas together, giving 0.2195 seals/km2. This might be too high. 
+
+
+*Harp seals* - the most abundant pinnipeds, with a total population size in eastern Canada estimated to be 4.2 million in 1990, increasing to 5.2 million animals in 1996 (Stenson et al., MS 1999). In the NW Atlantic, the estimated population number for 2010 was 7.8 million seals (Hammil et al 2014) using a model based on annual age specific reproductive rates, reported harvests, struck and loss, bycatch, and ice-related mortality of young of the year (YOY), into an age-structured model to estimate total population size since 1952. The model is fitted to estimates of pup production obtained from periodic aerial surveys and mark-recapture studies by adjusting the initial population size in 1952 and adult mortality rates (Hammill et al. 2011). The authors present model results adjusted over the years depending on different environmental factors. The estimated 2014 population is 7,411,000 (SE=656,000) animals.
+
+For my models, I am averaging model results analyzed in the current year (2014 - text and Table 1 in Hammil et al 2014) for 2008, 2010, 2012 and 2014, giving 7,227,750 seals and divided by a rough estimation of the distribution area of harp seals I did on google maps - 3,096,865 km2 (see figure 1 in Hammil et al 2010, J. Northw. Atl. Fish. Sci.).
+
+In the NW Atlantic (Davis-Baffin and Atlantic Arctic), the estimated population number for 2012 was 7,420,000 (95% CI 6,360,000 - 8,360,000) (Hammill et al. 2015).
+
+
+Distribution area (areas from wikipedia):
+Baffin Bay: 689,000 km2
+Hudson Bay: 1,230,000 km²
+Ungava Bay: 50,000 km2
+Foxe Basin: 150,000 km2
+Labrador Sea: 841,000 km² 
+Hudson Strait: 93,750 km2
+Lancaster Sound: 110,000 km2
+
+```{r}
+bearded_abundance <- 0.024
+hooded_abundance <- 593500/(689000+2014447) 
+harp_abundance <- ((7500000+7100000+6900000+7411000)/4)/3096865 
+
+#alternatively considering Cleator 1996, Hammill and Stenson 2006 and Hammill et al 2015 in State of the Arctic Marine Biodiversity Report (SAMBR) by CAFF (2017)
+
+area <- 689000+1230000+50000+841000+150000+93750+110000
+
+bearded_abundance_SAMBR <- 190000/area #assuming similar distribution area for the seals
+hooded_abundance_SAMBR <- 593500/area
+harp_abundance_SAMBR <- 7420000/area
+
+
+```
+
+
+
+**Biomass**:  
+
+Calculated based on (weight_kg/1000)*abundance.
+
+
+```{r}
+
+bearded_biomass <- weight_bearded/1000*bearded_abundance
+hooded_biomass <- weight_hooded/1000*hooded_abundance
+harp_biomass <- weight_harp/1000*harp_abundance
+
+Biomass_SS <- bearded_biomass + hooded_biomass + harp_biomass 
+
+Biomass_SS_year <- bearded_biomass + hooded_biomass/4 + harp_biomass*0.2 
+#assuming only 20 % of harp seals come and stay year-round, bearded are there year round and hooded seals only in summer months
+
+
+#alternatively considering Cleator 1996, Hammill and Stenson 2006 and Hammill et al 2015 in SAMBR report
+bearded_biomass_SAMBR <- weight_bearded/1000*bearded_abundance_SAMBR
+hooded_biomass_SAMBR <- weight_hooded/1000*hooded_abundance_SAMBR
+harp_biomass_SAMBR <- weight_harp/1000*harp_abundance_SAMBR
+
+Biomass_SS_SAMBR <- bearded_biomass_SAMBR + hooded_biomass_SAMBR + harp_biomass_SAMBR 
+
+Biomass_SS_SAMBR_year <- bearded_biomass_SAMBR + hooded_biomass_SAMBR/4 + harp_biomass_SAMBR*0.2 
+
+
+```
+
+
+**Landings**:
+
+*Bearded seal* 
+Very little is known about the bearded seal in the Canadian Arctic (Davis et al., 1980). It is taken in relatively small numbers in virtually all coastal communities and is thought to be most abundant in Hudson Strait, Foxe Basin and along the west coast of Hudson Bay (Mansfield, 1967).
+
+Catch Database of NAMMCO (https://nammco.no/topics/catch-database/) reports 1036 catches from 2011-2018 (years that report West Greenland separated from East Greenland) for West Greenland. There is no data for Canadian Arctic from NAMMCO.
+
+From 1996 to 2001, an yearly average of 735 bearded seals was taken by Native communities in the Nunavut Settlement Area, encompassing the east coast of Baffin Island west to Inuvialuit and south to Belcher Islands in Hudson Bay (Priest and Usher 2004). For my models I counted the reported values for Clyde River and Qikiqtarjuaq, and half the harvest of Pond Inlet, and divided by the model area 81,448 km2 (likely the only communities harvesting in this area). Clyde River reported 19 seals/year, Qik reported 22 seals/year, and Pond Inlet reported 28 seals/year (half is 14 seals/year) totaling 55 seals/year. 
+
+*Hooded seal* 
+Hooded seal harvests are not regulated. For 2005 (same year for which I have population abundance) the harvest estimates are 13,473 (Hammil and Stenson 2006). I am considering the same area I did for abundance estimates for consistency, i.e. the whole area of distribution in West Atlantic.
+
+*Harp seal*
+Removals from subsistence harvest as well as commercial and bycatch are in Table 4 of Hammil et al (2014). I am considering the same rough area I did to calculate abundance - 3,096,865 km2 - and the harvest numbers averaged for years 2008, 2010, 2012 and 2013 (no 2014) to be consistent with what I did for abundance estimates. The average harvest number is 208,482.25 seals/year. 
+
+This is for calculating fishing mortality. For harvest, I will only consider the seals that are taken in the Arctic, which have been ~1000 per year in the last few years (and divide by model area).
+
+
+
+**Fishing mortality**: 
+
+(landings_ind_year*weight_ton/area)/biomass
+
+
+```{r}
+
+fishing_bearded <- (55*(weight_bearded/1000/81448))/bearded_biomass 
+fishing_hooded <- (13473*(weight_hooded/1000/(689000+2014447)))/(593500/(689000+2014447))
+fishing_harp <- (208482.25*(weight_harp/1000/3096865))/(7227750*(weight_harp/1000)/3096865)
+
+#harvest seals ton/km2
+
+harvest_bearded <- 55*(weight_bearded/1000/81448)
+harvest_hooded <- 13473*(weight_hooded/1000/(689000+2014447))
+harvest_harp <- 1000*(weight_harp/1000/81448)
+
+harvest_SS <- harvest_bearded*(bearded_biomass/Biomass_SS_year) + harvest_hooded*(hooded_biomass/4/Biomass_SS_year) + harvest_harp*(harp_biomass*0.2/Biomass_SS_year) 
+
+harvest_SS
+
+#alternatively based on SAMBR
+
+fishing_bearded_SAMBR <- (55*(weight_bearded/1000/81448))/bearded_abundance_SAMBR 
+fishing_hooded_SAMBR <- (13473*(weight_hooded/1000/area))/hooded_abundance_SAMBR
+fishing_harp_SAMBR <- (208482.25*(weight_harp/1000/area))/harp_abundance_SAMBR
+
+
+
+harvest_bearded2 <- 55*(weight_bearded/1000/81448)
+harvest_hooded2 <- 13473*(weight_hooded/1000/area)
+harvest_harp2 <- 1000*(weight_harp/1000/81448)
+
+harvest_SS_SAMBR <- harvest_bearded2*(bearded_biomass_SAMBR/Biomass_SS_SAMBR_year) + harvest_hooded2*(hooded_biomass_SAMBR/4/Biomass_SS_SAMBR_year) + harvest_harp2*(harp_biomass_SAMBR*0.2/Biomass_SS_SAMBR_year) 
+
+harvest_SS_SAMBR
+
+
+```
+
+
+
+**P/B**: 
+
+
+Life span for bearded seal is 30 years (Trites and Pauly 1998), hooded seal is 30 years (Jefferson et al 2015 in Marine Mammals of the World), harp seal is 31 years (Kjellqwist et al 1995). 
+
+For hooded seals, Hammil and Stenson (2006) estimated adult mortality rates varying from 0.12 to 0.13.
+
+
+```{r}
+#For seals I averaged surrogate 2 
+
+mortality_bearded <- 0.0899 #these value were calculated in the Mortality_calculations_marine_mammals spreadsheet
+mortality_hooded <- 0.0899
+mortality_harp <- 0.0873
+
+mortality_SS <- mortality_bearded*(bearded_biomass/Biomass_SS_year) + mortality_hooded*(hooded_biomass/4/Biomass_SS_year) + mortality_harp*(harp_biomass*0.2/Biomass_SS_year) 
+
+mortality_SS
+
+
+
+PB_bearded <- fishing_bearded + mortality_bearded
+PB_hooded <- fishing_hooded + mortality_hooded
+PB_harp <- fishing_harp + mortality_harp
+
+#Total mortality weighed by species biomass in the functional group
+
+PB_SS <- PB_bearded*(bearded_biomass/Biomass_SS_year) + PB_hooded*(hooded_biomass/4/Biomass_SS_year) + PB_harp*(harp_biomass*0.2/Biomass_SS_year) 
+
+PB_SS
+
+
+#alternatively based on SAMBR values
+
+mortality_SS2 <- mortality_bearded*(bearded_biomass_SAMBR/Biomass_SS_SAMBR_year) + mortality_hooded*(hooded_biomass_SAMBR/4/Biomass_SS_SAMBR_year) + mortality_harp*(harp_biomass_SAMBR*0.2/Biomass_SS_SAMBR_year) 
+
+mortality_SS2
+
+
+
+PB_bearded_SAMBR <- fishing_bearded_SAMBR + mortality_bearded
+PB_hooded_SAMBR <- fishing_hooded_SAMBR + mortality_hooded
+PB_harp_SAMBR <- fishing_harp_SAMBR + mortality_harp
+
+#Total mortality weighed by species biomass in the functional group
+
+PB_SS2 <- PB_bearded_SAMBR*(bearded_biomass_SAMBR/Biomass_SS_SAMBR_year) + PB_hooded_SAMBR*(hooded_biomass_SAMBR/4/Biomass_SS_SAMBR_year) + PB_harp_SAMBR*(harp_biomass_SAMBR*0.2/Biomass_SS_SAMBR_year) 
+
+PB_SS2
+
+
+```
+
+
+
+**Diet composition**: 56.94 % Arctic/polar cod; 9.5 % Greenland halibut; 5.64 % Sculpin/Eelpout; 5.38 % small demersal fish; 2.8 % Omnivorous zooplankton; 1.2 % Large Crustaceans; 0.95 % Cephalopod; 0.08 % Bivalves; 0.02 % Marine worms; 17.4 % Krill (Import - I will consider they feed on this offshore)
+
+
+More detailed:
+
+56.94 % Arctic cod/polar cod; 9.5 % Greenland halibut; 4.84 % Sculpin; 0.97 % Eelpout; 0.3 % redfish; 0.02 % Fish doctor; 0.02 % Seapoacher; 0.02 % Seasnail; 5.02 % other fish; 17.4 % krill; 1.20 % Shrimp; 2.8 % amphipods; 0.95 % Cephalopod; 0.02 % Snail; 0.06 % Clam; 0.02 % Polychaete 
+
+
+*Bearded seal* - 24 % Arctic cod *Boreogadus saida*; 8 % Polar cod; 55 % Sculpin (mostly *Myoxocephalus Scorpius* and *Gymnocanthu tricuspis*); 11 % Eelpout (particularly *Lycodes polaris*); <1 % Fish doctor (*Gymnelis sp*); <1 % Seapoacher (*Agonus decagonus*); <1 % Seasnail (*Liparis sp.*); <1 % Unidentified fish; <1 % Snail (mostly *Buccinum spp.*); <1 % Shrimp (especially *Sclerocrangon boreus*); <1 % Clam (e.g. *Serripes groenlandicus*); <1 % Cephalopod (*Bathypolypus arcticus* and *Gonatus spp.*); <1 % Polychaete (*Harmothoe*); some might eat sea cucumbers and anemones 
+
+Study of bearded seal diet in three locations of the Canadian Arctic - Pond Inlet, Grise Fiord and Clyde River - in summer of 1978-1980 (Finley and Evans 1983) estimated the wet weight diet %. The results are the average of the three regions and two years of study.
+
+
+*Hooded seal*: 75.95 % Greenland halibut; 2.2 % Redfish; 12.7 % Arctic cod/polar cod; 7.45 % Other fish; 0.3 % Pandalus; 1.05 % cephalopods; 0.35 % Other molluscs
+
+There are no studies reporting hooded seal diet near Baffin Island. A study in Southwest Greenland, Central West Greenland, Ummannaq and Upernavik has diets from 1986-1993 (Kapel 2000). Stomachs were taken by hunters in the Spring. I will consider the most recent study, but not consider SW and CW Greenland because capelin seems to be important there, but near Baffin Island probably not much capelin:
+
+Ummanaq
+86.6 % Greenland halibut	
+4.4 % Redfish
+7.9 % Other fish
+0.6 % Pandalus
+0.2 % cephalopods	
+0.4 % Other molluscs
+
+Upernavik
+25.4 % Arctic cod/polar cod
+65.3 % Greenland halibut	
+7.0 % Other fish
+1.9 % cephalopods	
+0.3 % Other molluscs	
+
+For the diet here I averaged the diet for these two regions.
+
+
+*Harp seal*: 0.42 % Gadus sp.; 66.34 % Polar cod; 5.16 % other fishes; 1.46 % prawns; 22.08 % krill; 3.23 % amphipods; 0.3 % other crust.; 1.02 % squid
+
+
+For harp seal the same study by Kapel (2000) reports diets in NW Greenland. This includes Uummannaq in August and Upernavik in June, August and September. I averaged the % diet in Baffin Island, and will consider capelin as Arctic cod, as these species have similar ecological roles (small and abundant pelagic fish)
+
+Diet composition for the functional group was weighed based on relative abundance of each seal.I increased the pressure on some food items, and added flounder to decrease the pressure on Arctic cod and allow for diet plasticity. Also, the biomass of each seal species is uncertain so their diet can be quite diverse based on individual diets.
+
+
+**Energetics - E**: 
+
+Hooded, harbour, bearded and harp seals are phocids, so a = 200.
+
+Ochoa-Acuña et al 2008 estimated digestible energy intake of seven harp seal as 32.425 MJ/day averaging all seasons (this value accounts for assimilation efficiency in Lawson - see ringed seal). 
+
+Lawson et al. (1997) estimated assimilation efficiencies (uncorrected for urinary loss) of Harp Seals fed various prey types to vary from 0.81 to 0.91 (in Stenson 2013 DFO report).
+
+
+```{r}
+
+E_bearded <- 200*(weight_bearded^0.75)
+E_hooded <- 200*(weight_hooded^0.75)
+E_harp <- 200*(weight_harp^0.75)
+
+E_harp_Ochoa <- 32.425*1000
+E_bearded_Williams <- 651.2*(weight_bearded^0.87)
+E_hooded_Williams <- 651.2*(weight_hooded^0.87)
+  
+```
+
+
+**Q/B**: 
+
+To calculate Q (consumption per individual), I first need to convert kcal/day to ton of food per year. For that, I need to know how many ton of seal food items correspond to these many kcal. Then I have to calculate the consumption for the functional group weighed by the biomass of each seal in the model area.
+
+
+
+```{r}
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_bearded_kJ_year <- E_bearded*4.186*365 #energy requirements of one seal per year
+E_bearded_kJ_year
+
+E_hooded_kJ_year <- E_hooded*4.186*365 #energy requirements of one seal per year
+E_hooded_kJ_year
+
+E_harp_kJ_year <- E_harp*4.186*365 #energy requirements of one seal per year
+E_harp_kJ_year
+
+
+E_seal_kJ_year <- E_bearded_kJ_year*(bearded_biomass/Biomass_SS_year) + E_hooded_kJ_year*(hooded_biomass/4/Biomass_SS_year) + E_harp_kJ_year*(harp_biomass*0.2/Biomass_SS_year) 
+
+#based on SAMBR
+
+E_seal_kJ_year_SAMBR <- E_bearded_kJ_year*(bearded_biomass_SAMBR/Biomass_SS_SAMBR_year) + E_hooded_kJ_year*(hooded_biomass_SAMBR/4/Biomass_SS_SAMBR_year) + E_harp_kJ_year*(harp_biomass_SAMBR*0.2/Biomass_SS_SAMBR_year) 
+
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is: 23.78 % Arctic/polar cod; 7.5 % Greenland halibut; 2 % Flounder; 6.84 % Sculpin/Eelpout; 2 % redfish; 10.08 % Other small demersal fish; 20.4 % Euphausiids/mysids; 1.4 % Omnivorous zooplankton; 5 % Carnivorous zooplankton; 1 % Calanus; 5 % Large Crustaceans; 5 % Cephalopod; 5 % Bivalves; 5 % Marine worms
+ 
+#Of each dietary item these are the % contributions to the yearly requirements of seals in kJ
+
+cod_kJ_year_SS <- (23.78)/100*E_seal_kJ_year
+halibut_kJ_year_SS <- (7.5 + 2)/100*E_seal_kJ_year
+sculpin_kJ_year_SS <- 6.84/100*E_seal_kJ_year
+fish_kJ_year_SS <- (2+10.08)/100*E_seal_kJ_year
+squid_kJ_year_SS <- 5/100*E_seal_kJ_year
+invert_kJ_year_SS <- (5+5+5)/100*E_seal_kJ_year
+zoo_kJ_year_SS <- (20.4+1.4+5+1)/100*E_seal_kJ_year
+
+
+cod_ton_year_SS <- cod_kJ_year_SS/(4.5*1e+06)
+halibut_ton_year_SS <- halibut_kJ_year_SS/(5.5*1e+06)
+sculpin_ton_year_SS <- sculpin_kJ_year_SS/(4.155*1e+06)
+fish_ton_year_SS <- fish_kJ_year_SS/(7*1e+06)
+squid_ton_year_SS <- squid_kJ_year_SS/(4*1e+06)
+invert_ton_year_SS <- invert_kJ_year_SS/(1.6*1e+06)
+zoo_ton_year_SS <- zoo_kJ_year_SS/(3.73*1e+06)
+
+#based on SAMBR
+
+cod_kJ_year_SS2 <- (23.78)/100*E_seal_kJ_year_SAMBR
+halibut_kJ_year_SS2 <- (7.5 + 2)/100*E_seal_kJ_year_SAMBR
+sculpin_kJ_year_SS2 <- 6.84/100*E_seal_kJ_year_SAMBR
+fish_kJ_year_SS2 <- (2+10.08)/100*E_seal_kJ_year_SAMBR
+squid_kJ_year_SS2 <- 5/100*E_seal_kJ_year_SAMBR
+invert_kJ_year_SS2 <- (5+5+5)/100*E_seal_kJ_year_SAMBR
+zoo_kJ_year_SS2 <- (20.4+1.4+5+1)/100*E_seal_kJ_year_SAMBR
+
+
+cod_ton_year_SS2 <- cod_kJ_year_SS2/(4.5*1e+06)
+halibut_ton_year_SS2 <- halibut_kJ_year_SS2/(5.5*1e+06)
+sculpin_ton_year_SS2 <- sculpin_kJ_year_SS2/(4.155*1e+06)
+fish_ton_year_SS2 <- fish_kJ_year_SS2/(7*1e+06)
+squid_ton_year_SS2 <- squid_kJ_year_SS2/(4*1e+06)
+invert_ton_year_SS2 <- invert_kJ_year_SS2/(1.6*1e+06)
+zoo_ton_year_SS2 <- zoo_kJ_year_SS2/(3.73*1e+06)
+
+
+#When summing these I get the consumption per year of one seal. Need to multiply by the abundance of seals to get consumption for seals per year
+
+# APROACH 1
+
+#Assuming a 75 % assimilation rate - the seals need to eat an extra 25 % tons of fish/invertebrates to get the same caloric requirements
+
+Q_seal_ton_year_1 <- cod_ton_year_SS + halibut_ton_year_SS + sculpin_ton_year_SS + fish_ton_year_SS + squid_ton_year_SS + invert_ton_year_SS + zoo_ton_year_SS + (cod_ton_year_SS + halibut_ton_year_SS + sculpin_ton_year_SS + fish_ton_year_SS + squid_ton_year_SS + invert_ton_year_SS + zoo_ton_year_SS)*0.25
+
+QB_seal_1 <- Q_seal_ton_year_1*(bearded_abundance+hooded_abundance+harp_abundance)/Biomass_SS
+QB_seal_1 
+
+
+#based on SAMBR
+
+Q_seal_ton_year_1a <- cod_ton_year_SS2 + halibut_ton_year_SS2 + sculpin_ton_year_SS2 + fish_ton_year_SS2 + squid_ton_year_SS2 + invert_ton_year_SS2 + zoo_ton_year_SS2+ (cod_ton_year_SS2 + halibut_ton_year_SS2 + sculpin_ton_year_SS2 + fish_ton_year_SS2 + squid_ton_year_SS2 + invert_ton_year_SS2 + zoo_ton_year_SS2)*0.25
+
+QB_seal_1a <- Q_seal_ton_year_1a*(bearded_abundance_SAMBR+hooded_abundance_SAMBR+harp_abundance_SAMBR)/Biomass_SS_SAMBR
+QB_seal_1a 
+
+# APROACH 2
+
+#Assuming a 100 % assimilation rate for the most energetic dietary item - halibut and other fish in this case
+
+Q_seal_ton_year_2 <- cod_ton_year_SS + halibut_ton_year_SS + sculpin_ton_year_SS + fish_ton_year_SS + squid_ton_year_SS + invert_ton_year_SS + zoo_ton_year_SS + (cod_ton_year_SS + sculpin_ton_year_SS + squid_ton_year_SS + invert_ton_year_SS + zoo_ton_year_SS)*0.25
+
+QB_seal_2 <- Q_seal_ton_year_2*(bearded_abundance+hooded_abundance+harp_abundance)/Biomass_SS
+QB_seal_2 
+
+#based on SAMBR
+
+Q_seal_ton_year_2a <- cod_ton_year_SS2 + halibut_ton_year_SS2 + sculpin_ton_year_SS2 + fish_ton_year_SS2 + squid_ton_year_SS2 + invert_ton_year_SS2 + zoo_ton_year_SS2 + (cod_ton_year_SS2 + sculpin_ton_year_SS2 + squid_ton_year_SS2 + invert_ton_year_SS2 + zoo_ton_year_SS2)*0.25
+
+QB_seal_2a <- Q_seal_ton_year_2a*(bearded_abundance_SAMBR+hooded_abundance_SAMBR+harp_abundance_SAMBR)/Biomass_SS_SAMBR
+QB_seal_2a 
+
+
+#Average the two approaches
+
+QB_seal <- (QB_seal_1 + QB_seal_2)/2
+QB_seal
+
+
+#based on SAMBR
+
+QB_seal_SAMBR <- (QB_seal_1a + QB_seal_2a)/2
+QB_seal_SAMBR
+
+
+##########################################################################################
+#Based on Ochoa-Acuna et al 2008 & Williams et al 2020##################################
+########################################################################################
+
+E_harp_kJ_year_Ochoa <- E_harp_Ochoa*365 #energy requirements of one seal per year
+E_harp_kJ_year_Ochoa
+
+
+E_bearded_kJ_year_Williams <- E_bearded_Williams*365 #energy requirements of one seal per year
+E_bearded_kJ_year_Williams
+
+E_hooded_kJ_year_Williams <- E_hooded_Williams*365 #energy requirements of one seal per year
+E_hooded_kJ_year_Williams
+
+
+
+E_seal_kJ_year_SAMBR_new <- E_bearded_kJ_year_Williams*(bearded_biomass_SAMBR/Biomass_SS_SAMBR_year) + E_hooded_kJ_year_Williams*(hooded_biomass_SAMBR/4/Biomass_SS_SAMBR_year) + E_harp_kJ_year_Ochoa*(harp_biomass_SAMBR*0.2/Biomass_SS_SAMBR_year) 
+
+
+
+cod_kJ_year_Ochoa <- (23.78)/100*E_harp_kJ_year_Ochoa
+halibut_kJ_year_Ochoa <- (7.5 + 2)/100*E_harp_kJ_year_Ochoa
+sculpin_kJ_year_Ochoa <- 6.84/100*E_harp_kJ_year_Ochoa
+fish_kJ_year_Ochoa <- (2+10.08)/100*E_harp_kJ_year_Ochoa
+squid_kJ_year_Ochoa <- 5/100*E_harp_kJ_year_Ochoa
+invert_kJ_year_Ochoa <- (5+5+5)/100*E_harp_kJ_year_Ochoa
+zoo_kJ_year_Ochoa <- (20.4+1.4+5+1)/100*E_harp_kJ_year_Ochoa
+
+
+cod_ton_year_Ochoa <- cod_kJ_year_Ochoa/(4.5*1e+06)
+halibut_ton_year_Ochoa <- halibut_kJ_year_Ochoa/(5.5*1e+06)
+sculpin_ton_year_Ochoa <- sculpin_kJ_year_Ochoa/(4.155*1e+06)
+fish_ton_year_Ochoa <- fish_kJ_year_Ochoa/(7*1e+06)
+squid_ton_year_Ochoa <- squid_kJ_year_Ochoa/(4*1e+06)
+invert_ton_year_Ochoa <- invert_kJ_year_Ochoa/(1.6*1e+06)
+zoo_ton_year_Ochoa <- zoo_kJ_year_Ochoa/(3.73*1e+06)
+
+
+#Assuming assimilation efficiencies (uncorrected for urinary loss) of Harp Seals fed various prey types to vary from 0.81 to 0.91 
+
+
+Q_seal_ton_year_new_low <- cod_ton_year_Ochoa + halibut_ton_year_Ochoa + sculpin_ton_year_Ochoa + fish_ton_year_Ochoa + squid_ton_year_Ochoa + invert_ton_year_Ochoa + zoo_ton_year_Ochoa + (cod_ton_year_Ochoa + halibut_ton_year_Ochoa + sculpin_ton_year_Ochoa + fish_ton_year_Ochoa + squid_ton_year_Ochoa + invert_ton_year_Ochoa + zoo_ton_year_Ochoa)*0.19
+
+Q_seal_ton_year_new_high <- cod_ton_year_Ochoa + halibut_ton_year_Ochoa + sculpin_ton_year_Ochoa + fish_ton_year_Ochoa + squid_ton_year_Ochoa + invert_ton_year_Ochoa + zoo_ton_year_Ochoa + (cod_ton_year_Ochoa + halibut_ton_year_Ochoa + sculpin_ton_year_Ochoa + fish_ton_year_Ochoa + squid_ton_year_Ochoa + invert_ton_year_Ochoa + zoo_ton_year_Ochoa)*0.09
+
+
+QB_seal_low <- Q_seal_ton_year_new_low*(bearded_abundance_SAMBR+hooded_abundance_SAMBR+harp_abundance_SAMBR)/Biomass_SS_SAMBR
+QB_seal_low 
+
+QB_seal_high <- Q_seal_ton_year_new_high*(bearded_abundance_SAMBR+hooded_abundance_SAMBR+harp_abundance_SAMBR)/Biomass_SS_SAMBR
+QB_seal_high
+
+QB_seal_new <- (QB_seal_low+QB_seal_high)/2
+QB_seal_new
+
+```
+
+
+### Atlantic Walrus
+
+**Weigth**:  
+
+Female body mass estimated to be 530 kg and males 643 kg based on growth curves (Titres and Pauly 1998).
+
+In Acquarone et al 2006 six pacific walruses studies weighed between 1086 and 1370 kg. 
+
+According to Kastelein 2002, adult male walruses have an average body length of around 320 cm and weigh 1200–1500 kg; whereas adult females have a body length of around 270 cm and weigh 600–850 kg. Regional differences in body size per gender and age class exist.
+
+For my models I will consider the lower range in Kastelein for both male and female. 
+
+```{r}
+
+weight_W <- (1200 + 600)/2
+weight_W
+
+```
+
+
+**Abundance**:  
+
+A September 2011 survey of haulouts estimated 10,379 Walrus. In September 2014 an aerial survey of walrus in north and west Hudson Bay yielded a corrected estimate of 5,500 Walrus. In summer 2005-2008, aerial surveys estimated 2,100-2,500 walrus in the Hoare Bay area of south and east Baffin. An April 2012 survey estimated the population wintering in Hudson Strait at 6,020 Walrus, probably from various stocks (Hammill et al 2016).
+
+These suggest a minimum population size of 18,900 Walrus (including immature animals) in the Central and Low Arctic unit. Considering an estimated extent of occurrence of 1 759 137 km² the abundance would be 0.011 walrus/km2 (Hammill et al 2016).
+
+Helicopter surveys of the Southeastern Baffin Bay stock from 2005-2008 covered approximately 3,000 km of coastline, from Hudson Strait to Clyde River in the eastern coast of Baffin Island. Across the years the surveys were taken from late July-October. Minimum Counted Population (MCP) estimates ranged from 716 in 2006 to 1,056 in 2007. Using the maximum counts of 1,056 the authors estimated 2,100–2,500 walrus summer in Hoare Bay, on 3 key haul-out sites out of a total of 28 known haulout sites of South East Baffin Island (Stewart et al 2014). 
+
+From 21 March-19 April in 2006, 2008  and 2012, aerial surveys were conducted off West Greenland covering the main walruses wintering grounds. The total abundance of walruses detected on both ice and in water was estimated to be 1,105 (cv=0.31), 1,137 (cv=0.48) and 1,408 (cv=0.22) individuals in 2006, 2008, and 2012, respectively. The total area covered for these surveys (taking into account walrus seen on water and ice) was 60,199 in 2006, 34,332 in 2008 and 71,827 in 2012 (Heide-Jorgensen et al 2014).
+
+For my models, I will consider the abundace based on Hammill et al 2016. 
+
+
+
+```{r}
+
+Abundance_W <- 18900/1759137 
+Abundance_W
+
+
+```
+
+
+
+**Biomass**:  
+
+Calculated based on (weight_kg/1000)*abundance.
+
+
+```{r}
+Biomass_W_total_pop <- weight_W/1000*Abundance_W
+
+Biomass_W <- (weight_W/1000*Abundance_W)/4 # I am assuming walrus are in the modelled are only in the summer, but I am not sure of this, it could be that they are there in winter as well
+Biomass_W 
+
+```
+
+Walrus prey is largely found in waters less than 100 m, therefore walrus are associated with waters of 20-80 m deep (Stephenson and Hartwig 2010). 
+
+
+**Landings**: 
+
+Walrus in the Hudson Bay–Davis Strait (HB-DS) sub-population are hunted in both Canada and Greenland (Born et al. 1995, Priest and Usher 2004).
+
+Hudson Bay-Davis Strait sub-population is thought to supply walrus hunters from Whale Cove on Hudson Bay, through Hudson Strait to Clyde River on eastern Baffin Island and Killiniq in Nunavik (Northern Quebec).
+
+The most recent reported harvest is for 2016/17. From 2006-2016, the catches reported for the Hudson Bay-Davis Strait Atlantic walrus stock averaged (DFO 2018 on their website):
+
+```{r}
+
+landings_walrus <- (86+44+28+67+43+38+39+17+41+98)/10
+
+```
+
+
+
+**Fishing mortality**: 
+
+(landings_ind_year*weight_ton/area)/biomass
+
+To do this calculation I considered the area occupied by this sub-population to be 1 759 137 km² based on Hammill et al 2016 and the biomass/abundance estimates I used based on the wintering grounds off Greenland coast, but for the whole year. There could be some discrepancy here because the abundance in the summering grounds could be different (the number of individuals/km2 that winter in that region may be more or less compared to the whole sub-population).
+
+
+```{r}
+
+fishing_W <- (landings_walrus*(weight_W/1000/1759137))/(weight_W/1000*(Abundance_W))
+fishing_W
+
+#harvest ton/km2
+harvest_W <- landings_walrus*(weight_W/1000/1759137) 
+harvest_W
+
+```
+
+
+**P/B**: 
+
+Longevity for females is 29 for females and 36 for males, giving an average of 32.5 ~ 33 years (Titres and Pauly 1998).
+
+
+```{r}
+
+mortality_W <- 0.0825  #this value was calculated in the Mortality_calculations_marine_mammals spreadsheet - I considered surrogate 2 (seals)
+PB_W <- fishing_W + mortality_W
+PB_W
+
+```
+
+
+
+**Diet composition**: 94.11 % Bivalves; 0.97 % Marine worms; 4.53 % Echinoderms; 0.14 % Omnivorous zooplankton
+
+
+More detailed:
+
+48.17 % *Mya truncata* (bivalvia); 4.08 *Hiatella arctica* (bivalvia); 0.05 % *Astarte sp.* (bivalvia); 12.30 % *Serripes groenlandicus* (bivalvia); 24.11 % Unidentified remains (bivalvia); 0.05 % *Buccinum sp.* (gastropoda); 0.2 % *Natica clausa* (gastropoda); 0.05 Unknown gastropoda; 0.02 % *Eunoe sp.* (polychaeta); 0.05 *Nereis sp.* (polychaeta); 0.35 % *Flabelligera affinis* (polychaeta); 0.05 % *Thelpus cincinnatus* (polychaeta); 4.48 % Holothuroidea;  0.05 % *Strongylocentrotus droebachiensis* (echinoidea); 0.5 % *Priapulus caudatus* (priapulida); 0.05 % *Anonyx sarsi* (Omnivorous); 0.02 % *Boecksimus edwardsi* (Omnivorous); 0.05 % *Arcturus baffini* (Omnivorous); 0.02 % *Hemithyris psittacea* (brachiopoda); 0.02 % Decapoda (Omnivorous); 0.15 % Shell fragments; 5.2 % Unidentified organic remains
+
+Diet for walrus in the Arctic is available for Foxe Basin, northern Hudson Bay (Fisher and Stewart 1997). Diet is in mass % and I averaged the diet for summer and autumn months for 1987-1988, and assumed the dietary items <0.1 to be 0.05. Then adjusted to 100 %. I will not consider the shell fragments and unidentified organic remains in the models or for energetic needs.
+
+
+
+**Energetics - E**: 
+
+Walrus is a not a phocid or ottarid, but I will use the a for phocids so a = 200. 
+
+Acquarone et al 2006 (Aquatic Mammals) estimated FMR using the two-pool model, resulting in 328.1 (SE 8.7) MJ•day -1 and 365.4 (SE 15.4) MJ•day -1 for each of the two pacific walruses studies. Based on this, they estimated FMR using the same method in seven other pinniped species to derive a new, refined predictive equation for pinniped:
+
+Ln-FMR [MJ•day -1] = 0.173 + 0.816 Ln-Total Body Mass [kg]
+
+Acquarone 2004 (PhD thesis) estimated that a walrus in Young Sound in Northeast Greenland consumes 59 kg/walrus/24 wet hr. (95% CI: 41-73 kg/walrus/24 h) and the corresponding estimate of the total amount of SF bivalve WW consumed by walruses during the open water season was ca. 63 tons, based on estimates of mean total body mass TBM: 976 kg. Daily feeding rates in walruses (6-7% of TBM) indicate that the estimates of 63 tons and 74 tons are the most plausible.
+
+Noren et al 2012 (MEPS) developed a bioenergetic model for female pacific walrus in the Chukchi Sea. This model accounts for maintenance, growth, activity (active in-water and hauled-out resting), molt, and reproductive costs. Estimates for non-reproductive females 0–12 yr old (65−810 kg) ranged from 16,359 to 68,960 kcal d−1 (74−257 kcal d−1 kg−1) for years with readily available sea ice for which they assumed animals spent 83% of their time in water. This is equivalent to 7–8% and 14–9% of body mass per day for 5–12 and 2–4 yr olds, respectively. Estimated consumption rates of 12 yr old females were minimally affected by pregnancy, but lactation had a large impact, increasing consumption rates to 15% of body mass per day.  
+ 
+Noren et al 2014 (Physiological and Biochemical Zoology) studied bioenergetics of female walruses in aquariums. Model outputs were scaled to account for activity levels typical of free-ranging Pacific walruses, averaging 83% of the time active in water and 17% of the time hauled-out resting. Estimated caloric requirements ranged from 26,900 kcal d-1 for 2-yr-olds to 93,370 kcal d-1 for simultaneously lactating and pregnant walruses.
+
+
+```{r}
+
+E_W <- 200*(weight_W^0.75)
+E_W
+  
+library(SciViews)
+
+E_W_Acquarone <- ((0.173 + 0.816 * ln(weight_W))^2.71828)*1000 /4.186 #in Kcal /day
+  E_W_Acquarone
+  
+  #taking into account the studies by Noren et al, the values by Acquarone seem low; the range from Noren et al 2014:
+  
+E_W_Noren_min <- 26900
+E_W_Noren_max <- 93370
+  
+```
+
+
+**Q/B**: 
+
+To calculate Q (consumption per individual), I first need to convert kcal/day to ton of food per year. For that, I need to know how many ton of walrus food items correspond to these many kcal. 
+
+
+```{r}
+#Convert kcal/day to kJ/year based on 1 kcal = 4.186 kJ
+
+E_W_kJ_year <- E_W*4.186*365 #energy requirements of one walrus per year
+E_W_kJ_year
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Diet composition is 48.17 % *Mya truncata* (bivalvia); 4.08 *Hiatella arctica* (bivalvia); 0.05 % *Astarte sp.* (bivalvia); 12.30 % *Serripes groenlandicus* (bivalvia); 24.11 % Unidentified remains (bivalvia); 0.05 % *Buccinum sp.* (gastropoda); 0.2 % *Natica clausa* (gastropoda); 0.05 Unknown gastropoda; 0.02 % *Eunoe sp.* (polychaeta); 0.05 *Nereis sp.* (polychaeta); 0.35 % *Flabelligera affinis* (polychaeta); 0.05 % *Thelpus cincinnatus* (polychaeta); 4.48 % Holothuroidea;  0.05 % *Strongylocentrotus droebachiensis* (echinoidea); 0.5 % *Priapulus caudatus* (priapulida); 0.05 % *Anonyx sarsi* (amphipoda); 0.02 % *Boecksimus edwardsi* (amphipoda); 0.05 % *Arcturus baffini* (isopoda); 0.02 % *Hemithyris psittacea* (brachiopoda); 0.02 % Decapoda; 0.15 % Shell fragments; 5.2 % Unidentified organic remains
+#Of each dietary item these are the % contributions to the yearly requirements in kJ
+
+bivalves_kJ_year_W <- (48.17 + 4.08 + 0.05 + 12.3 + 24.11)/100*E_W_kJ_year 
+gastropods_kJ_year_W <- (0.05 + 0.2 + 0.05)/100*E_W_kJ_year
+polycheates_kJ_year_W <- (0.02 + 0.05 + 0.35 + 0.05)/100*E_W_kJ_year
+holothuroidea_kJ_year_W <- 4.48/100*E_W_kJ_year
+echinoids_kJ_year_W <- (0.05/100)*E_W_kJ_year
+priapulida_kJ_year_W <- (0.5/100)*E_W_kJ_year
+amphipods_kJ_year_W <- (0.05 + 0.05)/100*E_W_kJ_year
+isopoda_kJ_year_W <- (0.05 + 0.02)/100*E_W_kJ_year
+decapoda_kJ_year_W <- 0.02/100*E_W_kJ_year
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+bivalves_ton_year_W <- bivalves_kJ_year_W/(1.64*1e+06) 
+gastropods_ton_year_W <- gastropods_kJ_year_W/(3.31*1e+06) 
+polychaetes_ton_year_W <- polycheates_kJ_year_W/(2.64*1e+06) 
+holothuroidea_ton_year_W <- holothuroidea_kJ_year_W/(1.23*1e+06) 
+echinoids_ton_year_W <- echinoids_kJ_year_W/(1.13*1e+06) 
+priapulida_ton_year_W <- priapulida_kJ_year_W/(1.90*1e+06) 
+amphipods_ton_year_W <- amphipods_kJ_year_W/(3.27*1e+06) 
+isopoda_ton_year_W <- isopoda_kJ_year_W/(2.91*1e+06) 
+decapoda_ton_year_W <- decapoda_kJ_year_W/(3.91*1e+06) 
+
+ 
+
+#When summing these I get the consumption per year of one narwhal. Need to multiply by the abundance of narwhal to get consumption for  narwhal per km2
+
+# APROACH 1
+
+#Assuming a 75 % assimilation rate - the whale needs to eat an extra 25 % tons of fish/invertebrates to get the same caloric requirements
+
+Q_W_ton_year_1 <- bivalves_ton_year_W + gastropods_ton_year_W + polychaetes_ton_year_W + holothuroidea_ton_year_W + echinoids_ton_year_W + priapulida_ton_year_W + amphipods_ton_year_W + isopoda_ton_year_W +  decapoda_ton_year_W + (bivalves_ton_year_W+gastropods_ton_year_W+polychaetes_ton_year_W+holothuroidea_ton_year_W + echinoids_ton_year_W + priapulida_ton_year_W + amphipods_ton_year_W + isopoda_ton_year_W +  decapoda_ton_year_W)*0.25
+
+QB_W_1 <- Q_W_ton_year_1*(Abundance_W)/Biomass_W_total_pop
+QB_W_1 
+
+# APROACH 2
+
+#Assuming a 100 % assimilation rate for bivalves 
+
+Q_W_ton_year_2 <- bivalves_ton_year_W + gastropods_ton_year_W + polychaetes_ton_year_W + holothuroidea_ton_year_W + echinoids_ton_year_W + priapulida_ton_year_W + amphipods_ton_year_W + isopoda_ton_year_W +  decapoda_ton_year_W + (gastropods_ton_year_W+polychaetes_ton_year_W+holothuroidea_ton_year_W + echinoids_ton_year_W + priapulida_ton_year_W + amphipods_ton_year_W + isopoda_ton_year_W +  decapoda_ton_year_W)*0.25
+
+QB_W_2 <- Q_W_ton_year_2*(Abundance_W)/Biomass_W_total_pop
+QB_W_2 
+
+
+
+# APROACH 3
+#Assuming a 100 % assimilation rate for all other foods, but bivalves
+
+Q_W_ton_year_3 <- bivalves_ton_year_W + gastropods_ton_year_W + polychaetes_ton_year_W + holothuroidea_ton_year_W + echinoids_ton_year_W + priapulida_ton_year_W + amphipods_ton_year_W + isopoda_ton_year_W +  decapoda_ton_year_W + (bivalves_ton_year_W)*0.25
+
+QB_W_3 <- Q_W_ton_year_3*(Abundance_W)/Biomass_W_total_pop
+QB_W_3 
+
+
+#Average the three approaches
+
+QB_W <- (QB_W_1 + QB_W_2 + QB_W_3)/3
+QB_W
+
+########################################################################################
+#Based on Acquarone et al 2006###################################################
+#########################################################################################
+
+E_W_kJ_year_Acquarone <- E_W_Acquarone*4.186*365 #energy requirements of one walrus per year
+E_W_kJ_year_Acquarone
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Of each dietary item these are the % contributions to the yearly requirements in kJ - I will consider bivalves as representative
+
+bivalves_kJ_year_W_Acquarone <- (100)/100*E_W_kJ_year_Acquarone 
+
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+bivalves_ton_year_W_Acquarone <- bivalves_kJ_year_W_Acquarone/(1.64*1e+06) 
+
+
+# the average digestive coefficient for energy for a clam diet is 92.7% (Fisher et al., 1992)
+
+Q_W_ton_year_Acquarone <- bivalves_ton_year_W_Acquarone + (bivalves_ton_year_W_Acquarone)*0.073 #this is about 67 kg/walrus/day, comparable to PhD results indication 59 kg/walrus/day
+
+QB_W_Acquarone <- Q_W_ton_year_Acquarone*(Abundance_W)/Biomass_W_total_pop
+QB_W_Acquarone 
+
+
+
+#############################################################################################
+#Based on Noren et al 2014#############################################################
+##########################################################################################
+
+E_W_kJ_year_Noren_min <- E_W_Noren_min*4.186*365 #energy requirements of one walrus per year
+E_W_kJ_year_Noren_min
+
+E_W_kJ_year_Noren_max <- E_W_Noren_max*4.186*365 #energy requirements of one walrus per year
+E_W_kJ_year_Noren_max
+
+#Convert kJ/day to ton/year based on diet composition and energetics of diet
+#Of each dietary item these are the % contributions to the yearly requirements in kJ - I will consider bivalves as representative
+
+bivalves_kJ_year_W_Noren_min <- (100)/100*E_W_kJ_year_Noren_min 
+bivalves_kJ_year_W_Noren_max <- (100)/100*E_W_kJ_year_Noren_max 
+
+
+#Calculate what these kJ mean in terms of mass, i.e. ton of food from each dietary item per year
+
+bivalves_ton_year_W_Noren_min <- bivalves_kJ_year_W_Noren_min/(1.64*1e+06) 
+bivalves_ton_year_W_Noren_max <- bivalves_kJ_year_W_Noren_max/(1.64*1e+06) 
+
+
+# the average digestive coefficient for energy for a clam diet is 92.7% (Fisher et al., 1992)
+
+Q_W_ton_year_Noren_min <- bivalves_ton_year_W_Noren_min + (bivalves_ton_year_W_Noren_min)*0.073 #this is about 67 kg/walrus/day, comparable to PhD results indication 59 kg/walrus/day
+Q_W_ton_year_Noren_max <- bivalves_ton_year_W_Noren_max + (bivalves_ton_year_W_Noren_max)*0.073 #or 231 kg/walrus/day
+
+QB_W_Noren_min <- Q_W_ton_year_Noren_min*(Abundance_W)/Biomass_W_total_pop
+QB_W_Noren_min 
+
+QB_W_Noren_max <- Q_W_ton_year_Noren_max*(Abundance_W)/Biomass_W_total_pop
+QB_W_Noren_max 
+   
+```
+
+

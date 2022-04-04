@@ -1,0 +1,620 @@
+---
+title: "Fish-parameters"
+author: "Sara Pedro"
+date: "16/07/2020" altered "02/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo =FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+```
+
+The full citation corresponding to the literature cited in this file can be found in the Ecopath technical report for this project.
+
+### Calculating Production/biomass P/B (/year)  
+
+To convert fork length (FL) to total length (TL), the linear empirical relationships of Booth and Isted (1997) may be used. For fish with forked tails, the relationship employed is based on panga (Pterogymnus laniarus):
+
+$$FL = 0.901·TL – 0.6848$$		
+
+For fish with emarginated tails, the relationship is based on the lesser gurnard (Chelidonichthys quekerri):					
+$$FL = 0.9454·TL + 3.6166$$	
+
+To convert standard length (SL) to TL the conversion factor from Christensen and Pauly (1992) can be applied:
+
+$$TL = 1.1757·SL – 0.1215$$	
+
+
+The following relationships are normally based on total length:
+
+The relationship between asymptotic length and maximum length is described by the equation (Froese & Binohlan 2000): 
+
+$$log(L_{inf}) = 0·044 + 0·9841*log(L_{max})$$
+
+If a good estimate of the age at first maturity (tm) is available, e.g., from direct observation in fishes with pronounced annual spawning peaks, life-span (tmax) can be directly estimated from equation (Froese & Binohlan 2000):
+
+$$log(t_{max})= 0·5496 + 0·957*log(t_m)$$
+
+If assymptotic length (Linf), mean length at first maturity (Lm) and mean age at first maturity (tm) are known, K can be estimated from the rearranged VBGF (Beverton 1992): 
+
+$$K= ln(1/(1 - L_m/L_{inf})/t_m$$
+
+
+```{r}
+# Functions described above
+
+L_inf <- function(L_max) {
+   L_inf = 10^(0.044 + 0.9841*log10(L_max))
+   return(L_inf)
+}
+
+t_m <- function(t_max) {
+   t_m = 10^((log10(t_max)-0.5496)/0.957)
+   return(t_m)
+}
+
+
+K <- function(Lm, L_inf, tm) {
+   K = log(1/(1 - Lm/L_inf))/tm
+   return(K)
+}
+
+
+```
+
+P/B = Total mortality = Z = F + M2 + M0
+
+- F - fishing mortality
+- M2 - natural mortality due to predation
+- M0 - natural mortality due to old age, deceases, etc
+
+M0 can be estimated from the empirical relationship linking M, the parameters of the von Bertalanffy Growth Function (VBGF) and mean environmental temperature:
+
+$$M = K^{0.65} * L_{\infty}^{- 0.279} * T_c {} ^{0.463}$$
+
+- M - natural mortality (/year)
+- K - curvature parameter of the VBGF (/year) - this parameter can be found in fishbase per species
+- L$\infty$ - asymptotic length in cm
+- Tc - mean ambient temperature in $^\circ$C
+
+This can be done using the life-history tool in fishbase.org. In this context, we need to find good size/growth parameters for fish in Baffin Bay if available or use the equations described above (see on fishbase some of these parameters as well). For temperature, can assume the average temperature for Western Baffin Bay.
+
+In Baffin Bay, the water mass along the Canadian coast is colder compared to the Greenland coast, with surface waters varying from 0 to 5 °C and 30 to 32 ‰ salinity in summer and deep offshore waters, which can reach 2000 m, of about −0.5 °C and 34.5 ‰. In NAFO Division 0A, water temperatures are usually at or near 0°C (Treble 2002, Treble 2011). For fishes that inhabit the bottom at deeper waters, I will use a 0.5°C temperature to calculate parameters. For pelagic fish and fish in more coastal areas, I will use 1°C. For anadromous fishes I considered a temperature of 4°C, which is about the lower end of their preferred temperature.
+
+
+```{r}
+
+M <- function(K, L_inf, Tc) {
+   M = K^(0.65) * L_inf^(-0.279) * Tc^(0.463)
+   return(M)
+}
+
+
+```
+
+
+Fishing mortality is estimated based on catches (C) and biomass (B):
+
+F = C/B
+
+When no catches are recorded, natural mortality is assumed to equal Z.
+
+Functional groups
+When functional groups are composed of several species, the group P/B is estimated as a weighted mean (weighted by each species biomass B) of the species P/Bs.
+
+
+### Calculating Consumption/biomass QB (/month)
+
+When studies are available (normally for commercially-important species), consumption rates can be estimated from mean daily rations. These might exist for halibut, shrimp and Arctic char at least. 
+For species for which there is no published information on feeding, empirical formulae implemented in the life-history routine of fishbase can be used (from Palomares MLD, Pauly D. 1998. Predicting food consumption of fish populations as functions of mortality, food type, morphometrics, temperature and salinity. Marine Freshw. Res., 49, 447-453.):
+
+$$Log(Q/B.y-1) = 5.847 + 0.280*log(Z) - 0.152 * log(W\infty) - 1.360 * T´ + 0.0062 * A + 0.510 * h + 0.390 * d$$
+
+- Z - total mortality
+- W$\infty$ - asymptotic weight (kg)
+- T´- 1000/Kelvin (Kelvin = $^\circ$C + 273.15)
+- A - aspect ratio (height$^2$ (cm)/ surface area (cm) of the caudal fin)
+- h - dummy variable expressing food type (1 for herbivores, 0 for detritivores or carnivores)
+- d - dummy variable also expressing food type (1 for detritivores, and 0 for herbivores and carnivores)
+
+
+
+```{r}
+
+QB <- function(M, W_inf, Tc, A, h, d) {
+   QB = 10^(5.847 + 0.280*log10(M) - 0.152 * log(W_inf) - 1.360 * (1000/(Tc+273.15)) + 0.0062 * A + 0.510 * h + 0.390 * d)
+   return(QB)
+}
+
+QB_2 <- function(W_inf, Tc, A, h, d) {
+   QB2 = 10^(7.964 - 0.204* log(W_inf) - 1.965 * (1000/(Tc+273.15)) + 0.083 * A + 0.532 * h + 0.398 * d)
+   return(QB2)
+}
+```
+
+
+
+For cases when Z is not available, the following relation can be used:
+
+$$Log(Q/B.y-1) = 7.964 - 0.204* log(W\infty) - 1.965 * T´ + 0.083 * A + 0.532 * h + 0.398 * d$$
+
+
+### Greenland shark
+
+The biomass of Greenland shark in the Arctic is unknown.
+Greenland shark population biomass for the modeled area was calculated by the Ecopath model assuming an EE of 0.5. 
+
+
+**Landings/catches**:
+
+Greenland Shark bycatch occurs throughout the range of inshore and offshore commercial fisheries off the coast of Baffin Island, in NAFO Subarea 0 (Cosandey-Godin et al., 2015; Wheeland and Devine, 2018). In 2015 mean annual catch was 160.9 tons (Jørgensen and Treble, 2016). 
+
+
+**Fishing mortality**: 
+
+Landings according to Janjua et al 2015 are 0.00074072 ton/km2 from the Greenland halibut fishery bycatch. Yet, I don't know the biomass to calculate fishing mortality, so I will not subtract this from total mortality (P/B).
+
+Although in 2015, the mean annual catch was 160.9 tons (Jørgensen and Treble, 2016), from 2009-2011 it averaged 60.33 ton per year (Cosandey-Godin et al. 2014). To calculate total harvest, I am averaging these results and considering an area of 61747.07165 km2 (Treble and Nogueira 2020).
+
+
+```{r}
+
+fishing_GS <- 0
+fishing_GS
+
+harvest_GS <- (60+160.9)/2/61747.07165
+harvest_GS
+
+
+```
+
+
+**P/B**: 
+
+The P/B was calculated from a maximum length of 502 cm, an estimated lifespan of at least 272 years, age at first maturity of 156 years (length of first maturity of 350 cm), and a VBGF growth function K of 0.007 per year (Beverton, 1992; Yano et al., 2007; Nielsen et al., 2016). 
+
+Since I am not considering fishing mortality, the P/B for this species is likely to be larger than 0.007/year.
+
+
+```{r}
+
+# Calculate K (growth function parameter) based on length at maturity, assymptotic length and age at maturity
+K_GS <- K(Lm = 350, L_inf = 502, tm = 156)
+K_GS 
+
+# Calculate natural mortality
+M_GS <- M(K = K_GS, L_inf = 502, Tc = 1) 
+
+PB_GS <- M_GS + fishing_GS
+
+
+```
+
+
+
+**Diet composition**: 23.16 % Large demersal fish; 3.34 % Greenland halibut; 4.01 % Small demersal fish; 0.34 % Sculpins/Eelpouts; 1.14 % Greenland shark; 13.97 % Other seals; 0.71 % ringed seal; 0.05 % Polar bear; 45.19 % Cephalopods; 1 % Large crustaceans; 1.1 % seabirds; 3.99 %  Echinoderms; 2 % Other benthos
+
+More detailed:
+
+9.15 % *Gadus morhua*; 2.05 % *Gadus spp.*; 0.33 % *Micromesistius poutassou*; 0.19 % *Gadus ogac*; 1.76 % Unknown teleost; 1.57 % Rajidae; 0.71 % *Amblyraja radiata*; 0.71 % *Amblyraja hyperborea*; 3.34 % *Reinhardtius hippoglossoides*; 0.05 % *Hippoglossoides platessoides*; 0.43 % unknown flounder; 3.53 % *Cyclopterus lumpus*; 2.96 % *Anarhichas minor*;	1.38 % *Anarhichas lupus*; 0.86 % *Anarhichas denticulatus*; 0.29 % *Anarhichas* spp.; 0.76 % *Sebastes mentella*; 0.10 % *Sebastes marinus*; 0.10 % *Sebastes* spp.; 0.19 % *Lycodes* spp.; 1.14 % *Somniosus microcephalus*; 0.05 % *Cottunculus sadko*; 0.05 % *Cottunculus* spp.; 0.05 % *Myoxocephalus scorpius*; 0.14 % Unknown salmonid; 0.10 % *Macrourus berglax*; 6.86 % *Pagophilus groenlandicus*; 4.39 % Unknown seal; 2.72 % *Erignathus barbatus*; 0.71 % *Pusa hispida*; 3.00 % Unknown whale (blubber); 0.05 % *Ursus maritimus*; 25.98 % *Gonatus* spp.; 19.21 % *Histioteuthis* spp.; 0.05 % *Hyas* spp.; 0.05 % *Chionoecetes opilio*; 0.10 % Unknown auk; 0.05 % Ophiuroidea; 3.00 % Holothuroidea; 0.95 % Arctinaria; 0.71 % Echinoidae; 0.10 % Solasteridae; 0.10 % Asteroidea
+
+For my models I am using the diet composition from Nielsen et al 2019 for Greenland shark in East and West Greenland (not much data for the Canadian Arctic and what is available does not include biomass %) - Nielsen et al 2019 includes the largest sample and age class composition.
+
+
+**Q/B**:
+
+I calculated Q/B ratio using the Palomares and Pauly (1998) equation, and considering an aspect ratio (A) of 1.63 based on figures in fishbase.org. 
+
+
+```{r}
+# Calculate weight at infinity based on maximum length of 502 cm
+
+W_inf_GS <- 4.416 * 10^(-6) * 502^(3.1346)
+
+
+QB_GS <- QB(M = M_GS, W_inf = W_inf_GS, Tc = 1, A = 1.63, h = 0, d = 0)
+QB_GS
+
+# Assuming we do not know mortality rate
+
+QB_GS_2 <- QB_2(W_inf = W_inf_GS, Tc = 1, A = 1.63, h = 0, d = 0)
+QB_GS_2
+
+```
+
+
+## Other functional groups
+
+
+Fish species collected in Central Baffin Bay, Qik and Clyde River included the following families (based on data from the Amundsen Science):
+- Gadidae (mostly Arctic cod)
+- Zoarcidae (eelpouts) - small demersal fishes - mesobenthic-epibenthic
+- Liparidae (snailfishes) - small demersal fishes - mesobenthic-epibenthic
+- Cottidae (sculpins) - small demersal fishes - mesobenthic to epibenthic
+- Agonidae (poachers) - small demersal fishes - mesobenthic-epibenthic
+- Cyclopteridae (lumpsuckers) - small demersal fishes - mesobenthic-epibenthic
+- Stichaeidae (pricklebacks) - small demersal fishes - mesobenthic-epibenthic
+- Anarhichadidae (wolffishes) - large demersal fishes - epibenthic-mesobenthic (feeds on benthos)
+- Macrouridae (grenadiers)- large demersal fishes - mesobenthic
+- Myctophidae (lanternfishes) - forage fishes - mesopelagic fishes (feeds on zooplakton)
+- Phycidae (hakes/rocklings in the order Gadiformes)- small demersal fishes - mesopelagic to bathypelagic
+- Pleuronectidae (flounders) - small demersal fishes - epibenthic (feeds on benthos)
+- Rajidae (rays) - large demersal fishes - mesobenthic to bathybentic (feeds on zooplankton) 
+
+In order, the most abundant were Cottidae, Gadidae, Zoarcidae and Myctophidae. These are all small fishes.    
+
+
+Taking this into consideration, along with their habitat and diet composition, I will consider the following functional groups:
+
+- Greenland halibut
+- Arctic/polar cod 
+- Arctic char 
+- Cottidae/Zoarcidae - Sculpins/Eelpouts 
+- Small demersals - Lumpsuckers/Poachers/Snailfishes/Prickelbacks/Rocklings/Flounders
+- Large demersals - Grenadiers/Large cods/Wolffish/Rays
+- Small pelagics - Lanternfishes/Smelts/anglemouths
+
+
+The P/B and Q/B values for other species were estimated using the life parameters tool from fishbase and are included in the file Fish_parameters.xlsx. Diet composition for each functional group is also included in this file.
+
+
+### Greenland halibut
+
+**Biomass**: 
+
+In 2016, the halibut abundance survey took place from October 7 to November 5 and the trawl was used between 401-1500 m. The 2016 estimate of biomass in Div. 0A-South was 135,837 t (S.E. 18,103) and the abundance was estimated at 1.69 x 10^8 (S.E. 2.9 x 10^7), also an increase compared to previous years. The survey area between 401m and 1500 m in Div. 0A-South (to approximately 72N) is 47,924 km2 (Treble, 2017).
+
+```{r}
+
+biomass_halibut <- 135837/47924
+
+```
+
+
+**P/B**: 
+
+Natural mortality was calculated from a maximum length of approximately 90 cm in NAFO 0A area (Janjua et al., 2015), maximum age of 27 years, age at maturity of >11 (Atkinson et al., 1982) and length at maturity from 62-67 cm, and a VBGF growth function K of 0.108 per year (Froese and Binohlan, 2000). 
+
+
+**Fishing mortality**: 
+
+Greenland halibut fisheries in 0A area along the Baffin Island has given commercial status since 2007, with the exception of the inshore portion which falls within the Nunavut Settlement Area (NSA). Since 2008, the quota for the offshore is at 6400 t and the quota for inside the NSA has remained at 100 t. Fishery is most abundant in deep waters and is primarily concentrated along the 1000 m depth contour within Baffin Bay and extends north to approximately 73N.  Both mobile and fixed gear vessels are used in Greenland halibut fisheries including single and twin bottom otter trawls and fixed gear including longline or gillnets. The fishing season begins in June and ends in November. For NAFO Area 0A mean annual catch was estimate as 6366 t (2006-2013), it makes and harvest rate of 0.108 t.km-2.y-1 in the Greenland halibut habitat area (Treble and Nogueira, 2020).
+
+
+```{r}
+# Length at infinity from max length
+
+Linf_GH <- L_inf(90)
+
+# Calculate K (growth function parameter) based on length at maturity, assymptotic lenght and age at maturity
+K_GH <- K(Lm = 64.5, L_inf = Linf_GH, tm = 11)
+K_GH 
+
+# Calculate natural mortality
+M_GH <- M(K = K_GH, L_inf = Linf_GH, Tc = 1) #this seems a bit low so I will consider natural mortality on the lower end of values calculated for North Atlantic populations, i.e. 0.1/year
+
+# Fishinf mortality
+
+fishing_GH <- 0.108/2.83
+
+PB_GH <- 0.1 + fishing_GH
+
+```
+
+
+**Q/B**: 
+
+Relationship between weight and length calculated for Greenland halibut caught in Clyde River (Walsh 2008):
+
+Males:
+
+$$Weight(kg) = 0.072 exp^{0.055Length (cm)}$$
+
+Females:
+
+$$Weigth(kg) = 0.081 exp^{0.053Length (cm)}$$
+
+
+```{r}
+# Calculate weight at infinity based on maximum length of 90 cm
+
+W_inf_GH <- (0.072*exp(0.055*90) + 0.081*exp(0.053*90))/2
+
+
+QB_GH <- QB(M = M_GH, W_inf = W_inf_GH, Tc = 1, A = 1.32, h = 0, d = 0)
+QB_GH
+
+   
+```
+
+
+
+**Diet composition**: 24.25 % Arctic/polar cod; 2 % Greenland halibut; 5 % Sculpin/Eelpouts; 24.5 % Small demersal fish; 13.75 % Cephalopods; 17.75 % Large demersal fish; 2.13 % Carnivorous zooplankton; 1.075 % Omnivorous zooplankton; 0.025 % Calanus; 7.525 % Large crustaceans; 2 % Marine worms
+
+Mode detailed:
+
+41.75 % *Boreogadus saida*; 23.5 % *Liparis fabricii*; 11.75 % *Zoarcidae*; 15.25 % Unidentified fishes; 1.5 % eggs; 1.775 % *Boreomysis arctica* (Euphausiid); 1.025 % Ampeliscidae (Omnivorous); 0.275 % *Themisto libellula* (Carnivorous); 0.025 % *T. abyssorum* (Carnivorous); 0.025 % *Meganyctiphanes norvegica* (Euphausiid); 0.025 % Isopoda (Omnivorous); 0.025 % *Rhachotropis aculeata* (Carnivorous); 0.025 % *Thysanoessa inermis* (Euphausiid); 0.025 % *Sabinea septemcarinata* (Large crustaceans); 0.025 % *Gammarellus homari* (Omnivorous); 0.025 % *Calanus hyperboreous* (Calanus); 2 % polychaeta
+
+For Greenland halibut there are no diet composition studies in Baffin Bay. I am using data composition for the Beaufort Sea, since this study by Giraldo et al 2018 reported diet composition of halibut in wet weight %, in upper and lower slope from 2012-2014 August-September (I am averaging all). 
+
+There is an older study in Davis Strait that reports diet composition (% occurrence and % weight) by age the following dietary items (Orr and Bowering):
+
+Arctic cod
+Cephalopoda
+Euphausiacea
+Gammaridea
+Gonatus spp
+Hyperiidae
+Liparidae
+Mysidacea
+Natantia
+*Pandalus borealis*
+*Reinhardtius hippoglossoides*
+*Sebastes mentella*
+
+but does not report the % composition in a table (just a graph). As the fish grows, smaller fish like Arctic cod and redfish become less important, whereas other halibut become more important in diet. Also, P. borealis seems to contribute to diet 5-10 %. For Ecopath models, canibalism should not be higher than 5 %, otherwise I would have to separate in multi-stanzas (which I prefer not to). To take this into account, I considered that some of the pressure on Arctic cod consumed would be other halibut (just 2 %) and sculpins, and 7.5 % extra on large crustaceans, and replaced zoarcidae with cephalopods, as these seem to be an important dietary item in Davis Strait/Baffin Bay, while in this region zoarcidae did not contribute to their diet.
+
+I decreased the cannibalism, otherwise the model crashes.
+
+
+### Arctic char
+
+
+**Biomass**: There are some CPUE values for Arctic char in the fiords but these are not very reliable to calculate biomass of the populations in Baffin Bay (Muhammad Y. Janjua, per. Comm.).
+
+
+**PB**: 
+
+Janjua et al are currently studying population dynamics of Arctic char in fjords and lakes near the community of Qikiqtarjuaq, including Paddle Fjord, Nudluit Fjord and Circle Lake. Inuit from Qik catch Arctic char mainly near Paddle Fjord, Nudlung Fjord, Nedluseak Fjord and Confederation Fjord, especially Paddle Fjord. These authors calculated mortality rates based on natural mortality and fishing mortality in the studied regions (Muhammad Y. Janjua, per. Comm.), with resulting annual mortality of:
+
+```{r}
+
+PB_char <- ((18.5 + 16.7 + 21.2)/3)/100
+
+
+```
+
+
+**Diet composition**: 33.765 % Carnivorous zooplankton; 45.055 % Omnivorous zooplankton; 2 % Calanus; 3.18 % Arctic/polar cod; 3 % Sculpins/eelpouts; 3 % Other demersal fish; 1 % Marine worms
+
+The closest region with available diet composition is Frobisher Bay, in Hudson Strait (Spares et al 2012):
+
+More detailed: 
+
+1.35 % *Mallotus villosus*; 0.05 % *Myoxocephalus quadricornis*; 0.82 % *Gymnocanthus tricuspis*; 0.13 % *Lumpenus spp*; 1.83 % *Boreogadus saida*; 0.07 % *Eumicrotremus spinosus*; 0.77 % Unidentified fish remains; 22.55 %	Mysidacea (Carnivorous/Omnivorous); 29.26 % Hyperiidae (Carnivorous); 26.23 %	*Onesimus littoralis* (Omnivorous); 15.39 % *Gammarus duebeni* (Omnivorous); 0.02 % *Gammaracanthus loricatus* (Omnivorous); 0.001 %	*Amphithopsis longicaudata* (Omnivorous); 1.25 % Unidentified amphipod remais (Omnivorous); 0.16 % Decapoda (Euphausiids/Mysids); 0.03 % Annelida; 0.06 % Insecta; 0.12 % Unidentified and miscellaneous debris
+
+For my models I replaced capelin with Arctic cod (since capelin does not occur in the region as far as I am aware of), and increased the pressure on sculpins and other demersal fish. Also added Calanus.
+
+
+### Arctic/polar cod
+
+
+**Biomass**:
+
+Biomass of Arctic cod was calculated based on a dataset that belongs to Jennifer Herbig and Maxime Geoffroy. It contains Arctic cod biomass in the Baffin Bay shelf area for 0 and 0+ individuals in different areas of the water column. 
+
+
+**P/B**: 
+
+From fishbase (see file Fish_parameters).
+
+```{r}
+
+PB_Arcticcod <- (0.5 + 0.44)/2 #average of Arctic cod and polar cod
+
+
+```
+
+
+**Q/B**: 
+
+From fishbase (see file Fish_parameters).
+
+```{r}
+QB_Arcticcod <- (3.8 + 2.7)/2 #average of Arctic cod and polar cod
+
+```
+
+
+**Diet composition**: 46.15 % Omnivorous zooplankton; 12.1 % Carnivorous zooplankton; 41.75 % Calanus
+
+More detailed:
+
+20.75	% harpacticoida (Calanus/Omnivorous 2/1); 18.925 %	cyclopoida (Calanus/Omnivorous 2/1); 0.05 % calanoida (Calanus); 15.25 % nauplii (calanus); 1.525 % Ostracoda (Omnivorous); 31.425 % *Onisimus sp.* (Omnivorous); 9.875 % *Gammarus sp.* (Omnivorous); 2.1 % *Themisto sp.* (Carnivorous); 0.1 % Mysidacea (Euphausiids/Mysids)
+
+
+
+For Arctic cod, the closest region where diet composition was recorded was in Cornwallis Island, in the high Arctic in 2010 (July-August) by Matley et al 2013. The values are in % weight for three different age classes, which I averaged.
+Polar cod diet is quite similar, and since Arctic cod is much more abundant then polar cod, I am considering Arctic cod diet.
+
+Harpacticoida and cyclopoida are small copepods, so I will consider these as calanus or omnivorous and not carnivorous zooplankton since these tend to be larger zooplankton.
+
+
+
+###Small pelagic fish
+
+This group includes other pelagic forage fish in the area such as Glacier lanternfish (*Benthosema glaciale*) and Goiter blacksmelt (*Bathylagus euryops*).
+
+
+**P/B**: 
+From fishbase (see file Fish_parameters).
+
+```{r}
+
+PB_small_pelagics <- (0.7 + 0.56)/2 #average of Glacier lanternfish and goiter blacksmelt
+
+
+```
+
+
+**Q/B**: 
+From fishbase (see file Fish_parameters).
+
+```{r}
+QB_small_pelagics <- (3.9 + 5.8)/2 #average of Glacier lanternfish and goiter blacksmelt
+
+```
+
+**Diet composition**: 47.58 % Calanus; 19.10 % Omnivorous zooplankton; 33.03 % Carnivorous zooplankton
+
+More detailed in excel spreadsheet "Fish_parameters".
+
+Goiter blacksmelt (Mid-Atlantic Ridge in Sweetman et al 2014 - not the best location, but general enough that could apply) and diet from glacier lanternfish is from Nova Scotia in Sameoto 1980.
+
+
+### Sculpins/eelpouts
+
+Jørgensen et al. (2005) and Jørgensen et al. (2011) studied the detailed demersal fish assemblage in Southern and Northern Baffin Bay. Atlantic hookear sculpin (*Artediellus atlanticus*), Bigeye sculpin (*Triglops nybelini*), Ribbed sculpin (*Triglops pingelii*), polar sculpin (*Cottunculus microps*), Arctic eelpout (*Lycodes reticulatus*),  Doubleline eelpout (*Lycodes eudipleurostictus*), Pale eelpout (*Lycodes pallidus*) are common in the area (Jørgensen et al. 2005, Jørgensen et al. 2011, DFO 2013,  Kevin Hedges unpublished data).
+
+
+**P/B**: 
+From fishbase (see file Fish_parameters).
+
+```{r}
+
+PB_sculpin <- (0.73 + 0.35 + 0.28 + 0.16 + 0.25 + 0.32)/6 #average of Atlantic hookhear sculpin, Arctic eelpout, Pale eelpout, doubleline eelpout, Bigeye sculpin and Ribbed sculpin (no data for polar sculpin)
+
+
+```
+
+
+**Q/B**: 
+From fishbase (see file Fish_parameters).
+
+```{r}
+QB_sculpin <- (3.8 + 4.5 + 2.9 + 2.4 + 1.9 + 2.1 + 2.6)/7 #average of Atlantic hookhear sculpin, Arctic eelpout, polar sculpin, Pale eelpout, doubleline eelpout, Bigeye sculpin and Ribbed sculpin
+
+# Contribution of each species to the functional group based on QB (only the species for which I have diet):
+AHS <- 3.8/(3.8 + 4.5 + 2.9 + 2.4 + 2.1)
+AE <- 2.1/(3.8 + 4.5 + 2.9 + 2.4 + 2.1)
+PS <- 2.4/(3.8 + 4.5 + 2.9 + 2.4 + 2.1)
+BS <- 4.5/(3.8 + 4.5 + 2.9 + 2.4 + 2.1)
+RS <- 2.9/(3.8 + 4.5 + 2.9 + 2.4 + 2.1)
+
+```
+
+
+**Diet composition**: 18.725 % Omnivorous zooplankton; 34.175 % Carnivorous zooplankton; 0.33 % Calanus; 7.81  Arctic cod/polar cod; 3.88 % Small demersal fish; 14.40 % Marine worms; 5 % Bivalves; 7.65 % Large Crustaceans; 2.62 % Cephalopods; 3 % Echinoderms; 2.12 % Other benthos; 0.2  % Sculpin/eelpouts 
+
+
+More detailed:
+
+0.02 % Aegidae (isopode - Omnivorous); 0.70 % Agonidae (poacher - small demersal fish); 0.74 %	*Anonyx* sp. (amphipod - Omnivorous); 0.10 %	*Aphrodite aculeata* (marine worm); 0.02 % Arctinula (bivalve); 0.07 % *Bathyarca glacialis* (bivalve); 0.27 %	Bivalvia (bivalve); 0.02 %	Brachiopoda (bivalve); 0.03 % Calanoida (Calanus); 0.30 % Calanus (Calanus); 0.23 % *Calathura brachiata* (isopode - Omnivorous); 1.08 % Caridea (Large crustaceans); 2.62 %	Cephalopoda; 0.05 %	Chaetognatha (Carnivorous); 0.41 %	Colus (?); 6.48 %	Crustacea (Euphausiids/Mysids); 0.05 %	*Cryptonatica affinis* (marine sea snail - bivalves ; 0.12 %	Cumacea (Omnivorous); 0.03 %	Dendronotoidea (Echinoderms); 2.53 %	Euphausiidae (Euphausiids); 0.17 %	Euspira (bivalves); 0.05 %	*Euspira pallida* (bivalves); 0.09 %	Foraminifera; 5.39 %	Gammaridae (Omnivorous); 5.66 %	Gammaridea (Omnivorous); 0.22 %	Gastropoda (bivalves); 0.15 %	Hyperiidea (Carnivorous); 0.02 %	Isopoda (Omnivorous); 0.02 %	*Laona finmarchica* (bivalves); 4.37 %	*Lebbeus polaris* (Large Crustaceans); 0.06 %	Limacina (Carnivorous); 2.79 %	*Limacina helicina* (Carnivorous); 0.29 %	Limacinidae (Carnivorous); 0.51 %	Liparis (other demersal fish); 1.30 %	*Liparis fabricii* (other demersal fish); 0.07	% *Littorina obtusata* (bivalves); 0.82 %	Maldanidae (marine worms); 7.81 %	*Mallotus villosus* (Arctic cod); 0.02 %	*Margarites groenlandicus* (bivalves); 0.99 %	*Meganyctiphanes norvegica* (Euphausiids); 0.03 %	Metridia (Omnivorous); 0.05 %	Mysida (Euphausiids/Mysids); 0.64 %	Mysidae (Euphausiids/Mysids); 0.10 %	Nucula (bivalves); 0.02 %	Osteichthyes (other marine fish); 0.32 %	Ostracoda (Omnivorous); 0.17 %	Phyllodocidae (marine worms); 13.14 %	Polychaeta (marine worms); 0.12 %	Porifera (other benthos); 1.84 %	Pycnogonida (sea spider - Large Crustaceans); 0.27 %	*Rhachotropis aculeata* (Large Crustaceans); 0.27 %	*Saduria sabini* (isopode - Omnivorous); 0.10 %	Sagitta (marine worms); 0.05	% Scaphander (bivalves); 0.09 %	Sergestes (Large Crustaceans); 0.07 %	*Spiochaetopterus typicus* (marine worms); 0.19 %	*Stegocephalus inflatus* (Omnivorous); 0.36 %	Teleostei (other demersal fish); 1.07 %	Themisto (Carnivorous); 0.17 %	*Themisto abyssorum* (Carnivorous); 28.79 %	*Themisto libellula* (Carnivorous); 1.21 %	*Thysanoessa inermis* (Euphausiids); 1.29 %	Yoldiella (bivalves); 0.20 %	Zoarcidae (sculpin/eelpouts); 2.74 %	Digested food
+
+
+Since I do not have data on the relative abundance of each species in the functional group yet, I am correcting the diet based on the Q/B contribution of each species to the total Q/B (Atlantic hookhear sculpin, Polar sculpin, Arctic eelpout, Bigeye sculpin and Ribbed sculpin). The only data available is from a recent study in the Barents Sea (Eriksen et al 2020). 
+
+
+
+### Small demersals fish
+
+This group includes lumpsuckers, poachers, pricklebacks, snailfishes, rocklings and flounders, such as sea tadpole (*Careproctus reinhardt*), gelatinous sea snail (*Liparis fabricii*), Atlantic spiny lumpsucker (*Eumicrotremus spinosus*),  Atlantic poacher (*Leptagonus decagonus*), Arctic flounder (*Pleuronectes glacialis*) and Winter flounder (*Pseudopleuronectes americanus*) and Threadfin rockling (*Gaidropsarus ensis*). The Atlantic poacher is very common and represented dominant numbers both in southern and northern Baffin Bay (Jørgensen et al. 2005, Jørgensen et al. 2011, DFO 2013, Kevin Hedges unpublished data).
+
+The landings for flounder are from bycatch in Greenland halibut fishery and were 1.2 tonnes in 2015, yielding 1.94341E-05
+tonnes/km2/year (Jorgensen and Treble 2016). I considered the same area as previous bycatch species and halibut (see above).
+The P/B is likely a bit higher since I am not including the fishing mortality in the P/B.
+
+
+**P/B**: 
+From fishbase (see file Fish_parameters).
+
+```{r}
+
+PB_small_demersal <- (0.44 + 0.57 + 1.17 + 0.45 + 0.11 + 0.44)/6 #average of sea tadpole, gelatinous sea snail, leatherskin lumpsucker (no data for Atlantic spiny lumpsucker), Atlantic poacher, Arctic flounder and winter flounder
+
+
+```
+
+
+**Q/B**: 
+From fishbase (see file Fish_parameters).
+
+```{r}
+QB_small_demersal <- (2.4 + 2.9 + 4.8 + 3.1 + 3.4 + 2.2)/6 #average of sea tadpole, gelatinous sea snail, leatherskin lumpsucker (no data for Atlantic spiny lumpsucker), Atlantic poacher, Arctic flounder and winter flounder
+
+# Contribution of each species to the functional group based on QB (only the species for which I have diet):
+
+ST <- 2.4/(2.4 + 2.9 + 4.8 + 3.1 + 3.4)
+GSS <- 2.9/(2.4 + 2.9 + 4.8 + 3.1 + 3.4)
+LL <- 4.8/(2.4 + 2.9 + 4.8 + 3.1 + 3.4)
+AP <- 3.1/(2.4 + 2.9 + 4.8 + 3.1 + 3.4)
+AF <- 3.4/(2.4 + 2.9 + 4.8 + 3.1 + 3.4)
+
+```
+
+
+
+**Diet composition**: 25.35 % Omnivorous zooplankton; 45.55 % Carnivorous zooplankton; 14.22 % Marine worms; 1.33 % Bivalves; 3.93 % Calanus; 1.18 % Large Crustaceans; 1.25 % Echinoderms; 6.58 % Other benthos; 0.61 % small demersal fish
+
+
+More detailed in excel spreadsheet "Fish_parameters".
+
+Arctic flounder (n = 23) was collected by Atkinson and Percy (1991) in the western Arctic coastal areas of the southeast Beaufort Sea. Specimens were collected from near shore to depths of 90 m by trawl, gill net and dredge, during the day in July and August between 1963 and 1979. Arctic flounder preyed on 19 species with a mean of 7.0 per stomach. Its diet was dominated by the polychaete *Ampharete vega* (61:50: 91:101), the ascidian *Rhizomolgula globularis* (32:14:70:32) and the pelecypod *Macoma balthica* (5:19:83:20), which was consumed whole. Similar preferences for polychaetes, crustaceans and molluscs have been reported in other regions.
+
+I averaged the diet of the species based on their Q/B contribution to the Q/B of the functional group. Similar to the Sculpins/eelpout group, the only data available is from a recent study in the Barents Sea (Eriksen et al 2020 and an older one in the same region by Dolgov 1994) and the Beaufort Sea for flounders quite old. 
+
+
+
+### Large demersals
+
+This group includes grenadiers, large cods, redfish, wolffish and rays, Roughhead grenadier (*Macrourus berglax*), Spotted wolffish (*Anarhichas minor*), Arctic skate (*Amblyraja hyperborean*), thorny skates (*Amblyraja radiate*) and redfish.
+
+
+
+**Fisheries**:
+
+The landings for other marine fish are from bycatch in Greenland halibut fishery and were 60.1 tonnes in 2015, yielding 0.00097 tonnes/km2/year (Jorgensen and Treble 2016). I considered the same area as previous bycatch species and halibut (see above).
+
+
+
+**P/B**:
+From fishbase (see file Fish_parameters).
+
+
+```{r}
+
+PB_large_demersals <- (0.07  + 0.15 + 0.15 + 0.18 + 0.13)/5 #average of Roughhead grenadier, Spotted wolffish, Arctic and thorny skate, golden and deepwater redfish 
+
+harvest_large_demersals <- 60.1/61747.07165
+harvest_large_demersals
+
+```
+
+
+**Q/B**: 
+From fishbase (see file Fish_parameters).
+
+
+```{r}
+QB_large_demersals <- (1.1 + 0.9 + 1.1 + 1.3 + 1.5 + 2)/5 #average of  Roughhead grenadier, Spotted wolffish, Arctic and thorny skate, golden and deepwater redfish
+
+# Contribution of each species to the functional group based on QB (only the species for which I have diet):
+
+RGre <- 1.1/(1.1 + 0.9 + 1.3 + 2)
+SWof <- 0.9/(1.1 + 0.9 + 1.3 + 2)
+TSkate <- 1.3/(1.1 + 0.9 + 1.3 + 2)
+ReF <- 2/(1.1 + 0.9 + 1.3 + 2)
+
+
+```
+
+
+**Diet composition**: 13.32 % Other benthos; 8.55 % Omnivorous zooplankton; 6.13 % Calanus; 2.88 % Bivalves; 14.26 % Echinoderms; 4.53 % Marine worms; 13.21 % Carnivorous zooplankton; 0.59 % Sculpins/eelpouts; 21.30 % Large Crustaceans; 4.22 % large demersal fish; 3.29 % small demersal fish; 2.44 % Arctic/polar cod; 2.54 % Cephalopods; 2.05 % small pelagics
+
+
+
+More detailed in excel spreadsheet "Fish_parameters".
+
+
+For the diet composition I averaged the diets of Spotted wolffish (diet from Barents Sea (Eriksen et al 2020)), roughead grenadier (diet from the Barents Sea (Eriksen et al 2020)), skates (diet from Barents Sea (Eriksen et al 2020)), and redfish. There was no diet composition data for these species in Baffin Bay.
+
+I could only find one study on diet composition for Sebastes sp. near the region (Pedersen & Riget 1993). It reports diet in West Greenland in % occurrence from June-April 1990-1992. In % weight there is a study for the Barents Sea reporting diet for deepwater redfish (Eriksen et al 2020) - the dietary items are not very different from Pedersen & Riget, but include more euphausiids compared to amphipods (which might just be more abundant in the Barents Sea) and capelin (which is unlikely in west Baffin Bay).
+
+

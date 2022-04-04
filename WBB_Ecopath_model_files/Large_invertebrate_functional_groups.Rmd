@@ -1,0 +1,330 @@
+---
+title: "Other invertebrates-parameters"
+author: "Sara Pedro"
+date: "22/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo =FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+```
+
+The full citation corresponding to the literature cited in this file can be found in the Ecopath technical report for this project.
+
+
+### Production/biomass P/B (/year)  
+
+#### For benthic invertebrate species and functional groups
+
+Check this:
+
+BREY, T. 2001. Population dynamics in benthic invertebrates.A virtual handbook. The Virtual Handbook http://www.thomas-brey/science/virtualhandbook
+
+
+#### For cephalopod species and functional groups
+
+Check this website:
+http://cephbase.eol.org/
+
+
+### Consumption/biomass QB (/month)
+
+#### For benthic invertebrate species and functional groups
+
+ Q/B is largely unknown for benthic fauna - can assume trophic efficiency value and let the model estimate the Q/B 
+
+
+
+### Diet matrix (%)
+
+In aggregated functional groups, species diet matrices should be aggregated: each percentage in the aggregated diet is a weighted mean (weighted by each species consumption Q) of the respective percentages from the species diets.
+
+
+# Invertebrate functional groups
+
+- Large crustaceans - include shrimps (e.g. *Pandalus borealis*) and crabs
+- Cephalopods 
+- Bivalves - includes bivalves and gastropods (although not much info on gastropods)
+- Echinoderms
+- Polychaetes
+- Other benthos - include sponges, tunicates, etc
+
+## Biomasses 
+Biomass for some groups were calculated for some of the groups from Amundsen Science data belonging to Gustavo Yunda-Guarin (unpublished data) - epibenthic fauna biomass from Agassiz trawl in Baffin Bay. In some cases the biomass seemed too low so I used data from previous studies.
+
+## Large crustaceans
+
+Include shrimps (e.g. *Pandalus borealis*) and crabs. I will use *Pandalus* sp. as the representative species of the functional group.
+
+Northern Shrimp (*Pandalus borealis*) is found in the Northwest Atlantic from Baffin Bay to the Gulf of Maine, while Striped Shrimp (*P. montagui*) is found from Davis Strait south to the Bay of Fundy. Both species have preferred depth and temperature ranges. *Pandalus montagui* prefers cooler water (-1 to 2°C) than *P. borealis* (0 to 4°C). In the assessment area, these cooler waters tend to occur at shallower depths. The bulk of the biomass of *P. borealis* is located at depths of 300–500 m, while *P. montagui* occur mainly at depths of 200–500 m. Northern Shrimp are associated with soft substrates whereas Striped Shrimp prefer harder bottoms. Since these two species’ thermal preference and depth overlap, they are often found occupying the same locations (Reeves, 1998; Hammill and Stenson, 2000; DFO, 2019).
+
+
+**P/B**: 
+
+Orr et al 2006 estimated mortality rates for shrimp in SFA 5 and 6 of 0.78 /year.
+
+The modelled area is a part of the Shrimp Fishing Area0, however  because of formidable ice and weather conditions this area has never been fished for shrimps beyond few exploratory trials.
+
+Wieland et al calculated weight-length relationship for Northern shrimp in NAFO sub-area 1 and Dividion 0A (Greenland coast):
+
+1988-2000: 
+$$W = 0.000669 * L^{2.96}$$
+
+2001-2002: 
+$$W = 0.000483 * L^{3.0576}$$
+2003: 
+$$W = 0.000752 * L^{2.9177}$$
+
+2004: 
+$$W = 0.000765 * L^{2.9092}$$
+
+where W is weight in g and L is carapace length in mm.
+
+Sea Life base contains estimates for natural mortality of 0.4, 1.29, 0.24 and 1.58 /year for Alaska and the Barents Sea. 
+
+```{r}
+
+#natural mortality on average, including study by Orr et al
+
+M_shrimp <- (0.4 + 1.29 + 0.24 + 1.58 + 0.78) /5
+
+
+```
+
+From other models:
+
+Ainsworth et al 2002 estimated a P/B ratio for shrimp (smooth shrimp, spiny shrimp, pink shrimp, coonstripe, humpback shrimp, sidestripe and prawn) of 5.75 /year (with no fishing pressure) obtained from Beattie (2001). The authors estimated the Q/B ratio of shrimp by assuming a P/Q ratio of 25%.
+
+Pedersen and Zeller 2001 (Ecopath model for West Greenland) estimated a P/B of 0.9 year-1 based on Rønnow (1992), and a personal communication from D.G. Parsons (Science Branch, Dept. of Fisheries and Oceans, St. John’s, Newfoundland, Canada), who considered this level of total mortality to be reasonable for the West Greenland shrimp populations. A Q/B value of 6 year-1 was assumed for the consumption/biomass ratio. The diet of northern shrimps consists mainly of detritus, zooplankton and some benthos (Shumway et al. 1985; Hopkins et al., 1989; Ivanova, 2000).
+
+Whitehouse et al 2014 estimated the P/B ratios for shrimps in the Chuckchi Sea model to be 0.576 and the Q/B to be 2.409.
+
+For my models I will use a P/B of 0.858 /year as this ratio approximates the 0.9 used by Petersen and Zeller for the neighboring region of West Greenland.
+
+
+**Q/B**: 
+
+Moles 1999 calculated feeding rates for Pandalid shrimp from Alaska in a lab experiment. These were kept in water at 4°C and 29.5 ppt salinity. The feeding rates ranged from 0.05 - 0.15 grams eaten per shrimp per week, i.e. on average 0.1 grams each per week.
+
+```{r}
+#Convert grams per week to tonnes per year (per shrimp)
+
+Q_rate_shrimp <- (0.1/1e+6)*52.1429
+
+#Need to know the biomass of shrimp in the area to know the Q/B
+
+```
+
+While I don't have biomass estimated for shrimp, I will use the same Q/B ratio of Pedersen and Zeller for the West Greenland model. 
+
+**Diet composition**: 5% Calanus; 12.5% Omnivorous zooplankton; 12.5% Carnivorous zooplankton; 5% other benthos; 5% echinoderms; 10% marine worms; 5% phytoplankton; 45% detritus
+
+*P. borealis* is opportunistic. Their diet in Greenland in the 50s and 70s was described to include mysids, polychaetes, foraminifera, radiolaria, sand, and planktonic crustaceans (50s), and phytobenthos (gammarid amphipods), crustaceans, polychaetes, foraminifera, pelecypods, ophiuroids, euphausiids, and copepods.
+
+From Pedersen and Zeller for Northern shrimp (based on these previous studies):
+
+20% benthos; 10% Large zooplankton; 25% Small zooplankton; 5% phytoplankton; 40% detritus
+
+The benthos included all benthic invertebrates, including echinoderms, polychaetes, molluscs and miscellaneous crustaceans, nematodes and other meiofauna.
+
+Large zooplankton consisted mainly of animals of or larger than 1 mm, while small zooplankton are components smaller than 1 mm.
+
+I will adapt this diet composition into my models according to my functional groups. I will split the benthos between large other benthos (5%), echinoderms (5%) and marine worms (10%); large and small zooplankton among copepods (10%), small crustaceans (10%), other mesozooplankton (5%) and euphausiids (10%)
+
+## Cephalopods
+
+**Biomass**
+
+Only 10 species of cephalopods are found in high Arctic latitudes and complete their entire life cycle (including reproduction) in the Arctic. These are *Cirroteuthis muelleri* (cirrate), *Bathypolypus arcticus*, *B. bairdii*, *B. pugniger*, *Muusoctopus sp.*, *M. sibiricus* and *M. leioderma* (incirrates), *Rossia palpebrosa* and *R. moelleri* (sepiolids), and *Gonatus fabricii* (pelagic squid) (Xavier et al 2018). In Baffin Bay and the modelled area, *G. fabricii*, *Rossia sp.* and *C. muelleri* are the most important cephalopods (Gardiner and Dick 2010, Kevin Hedges Unpublished data) (Janjua et al 2015). *G. fabricci* and *C. muelleri* are meso-bathypelagic while *Rossia sp.* live in shelf to slope environments.
+
+We got some cephalopods from Amundsen Science - *Rossia megaptera* and *Bathypolypus bairdii*, but the data is not ideal to calculate their biomass. In the absence of good data on abundance or biomass, I set EE to 0.95 (following Hoover et al 2013) and let Ecopath estimate biomass.
+
+**P/B**: 
+
+Pedersen and Zeller (2001) calculated P/B ratio of 2.40 y-1 for squid in the west Greenland marine ecosystem while Heymans (2005) and Hoover et al. (2013) used P/B ratio of 2.55 y-1 for the Aleutian Island model and Hudson Bay model. 
+
+Following Janjua et al 2015, I averaged the P/B values from these previous studies/models.
+
+**Q/B**: 
+
+Pedersen and Zeller (2001) calculated Q/B ratio of 6.00 y-1 while Heymans (2005) and Hoover et al. (2013) used Q/B ratio of 6.9 y-1 for the Aleutian Island model and Hudson Bay model (Janjua et al 2015). 
+
+Following Janjua et al, I averaged the Q/B values from these previous studies/models.
+
+
+**Diet composition**: 10 % Carnivorous zooplankton; 10 % Omnivorous zooplankton; 10 % Calanus; 10 % Arctic cod; 10 % sculpins/eelpouts, 10 % Small demersal fish; 5 % cephalopods; 20 % large crustaceans; 15 % small pelagic fish 
+
+
+The diet of Arctic cephalopods includes mainly crustaceans and fish, yet the data available are limited. While incirrate octopods and sepiolids generally tend to prey on benthic organisms (mostly crustaceans), the main prey of squid are fish and pelagic crustaceans. Cannibalism is also common, especially in squid (Xavier et al 2018).
+
+*G. fabricci* feed on planktonic crustaceans, pteropods and chaetognathes before hooks appear, while after hooks appear they feed on fish and other *G. fabricci*. *Rossia sp.* feed on crustaceans and fish (Xavier et al 2018).
+
+I am basing the diet composition on this qualitative data and Kristensen 1984, and Carie Hovover models. From Janjua et al 2015:
+
+9 % other pelagic fish
+1 % cephalopods
+15 % small zooplankton
+50 % large zooplankton
+25 % other crustaceans
+
+From Hoover
+
+1% Arctic char, 1% Atlantic salmon, 5% gadiformes, 5% sculpins/zoarcids, 8% capelin, 8% sandlance, 1% other marine fish, 4% cephalopods, 18% macro-zooplankton, 4% euphausiids, 13% copepods, 10 % crustaceans, 10 % other meso-zooplankton, 12 % microzooplankton 
+
+## Bivalves
+
+**Biomass**
+
+This group includes bivalves and gastropods. Important species in the modelled area are *Portlandia artica*, *Hiatella arctica*,  *Chlamys islandica*, *Axinopsida orbiculata*, *Delectopecten groenlandicus*, *Mya truncate* (Janjua et al 2015).
+
+
+Estimates of abundance of Mya truncata were taken by Sifred 2005 around Qik. They estimated an average density for Old Broughton of 104.4 Mya·m-2 at 16m and 108.3 ± 34.5 Mya·m-2 (average ± 95% confidence interval) at 10m. In Lowland the average density was 95.4 ± 25.5 Mya·m-2. First River samples had an average density of 8.3 ± 4.5 Mya·m-2.
+
+The weight of clams on average 20.8 ± 1.7g.
+
+
+```{r}
+biomass_mya <- ((104.4+108.3+95.4+8.3)/4) * (20.8/907185)/1e+6  
+biomass_mya
+  
+```
+
+This study also calculated natural mortality to be 0.049.
+
+
+From the Amundsen Science (I think this is more offshore), the species collected were:
+
+*Astarte crenata*, Astarte sp., *Marsenina glabra*, *Calliostoma occidentale*, *Cuspidaria glacialis*, Cuspidaria sp, *Yoldiella lenticula*, *Yoldiella intermedia*, Yoldiella sp., *Siphonodentalium lobatum*, Siphonodentalium sp., *Bathyarca glacialis*, Bathyarca sp., Buccinum sp., *Buccinum ciliatum*, Thyasiridae sp., *Similipecten greenlandicus*, *Musculus niger*, *Hiatella arctica*, *Cyclopecten hoskynsi*, *Ennucula tenuis*, *Nuculana pernula*, Boreotrophon sp., *Limatula hyperborea*, *Lyonsiella abyssicola*
+
+I let Ecopath estimate bivalve/gastropod biomass assuming an EE of 0.95 (biomass estimates from the Amundsen Science seemed low).
+
+
+**P/B**: 
+
+The P/B ratio was taken as 0.57y-1 based on other ecosystem models (Bundy et al. 2000, Heymans 2003, Hoover et al. 2013) (in Janjua et al 2015). 
+
+Few thousand clams are captured by Clyde River and Qikiqtarjuaq communities but at present, there is no commercial harvest in the modelled area (Priest and Usher 2004). 
+
+
+**Q/B**: 
+
+The Q/B ratio as 6.33 y-1 based on other ecosystem models (Bundy et al. 2000, Heymans 2003, Hoover et al. 2013). 
+
+**Diet composition**: 3% Omnivorous zooplankton, 5% Carnivorous zooplankton, 5% microzooplankton, 5% phytoplankton, 12% ice algae and 70% detritus
+
+
+From Hoover et al 2013, based on Heymans 2003:
+3% copepods, 5% other meso-zooplankton, 5% micro-zooplankton, 5% pelagic production, 12% ice algae and 70% detritus
+
+
+
+## Echinoderms
+
+Brittle Star (Ophiuroidea), Sea urchin, (Strongylocentrotus sp.), Sea Cucumber (Holothuroidea) are most common in the study area (Aitken and Fourner 1993, Kevin Hedges Unpublished data).
+
+From GreenEdge, echinorderm species sampled included:
+
+*Ceramaster granularis*, *Ophiopholis aculeata*, *Ophiacantha bidentata*, *Ophioscolex glacialis*, *Ophiacantha spectabilis*, *Henricia* sp., *Stephanasterias albula*, *Leptychaster arcticus*, *Gorgonocephalus lamarckii *, *Pseudarchaster parelii*, *Icasterias panopla*, *Tylaster willei*, *Tremaster mirabilis*, *Urasterias lincki*, *Ctenodiscus crispatus*, *Hippasteria phrygiana*, *Hymenaster pellucidus*, *Pontaster tenuispinus*, *Ophiopleura borealis*, *Bathybiaster vexillifer*, *Heliometra glacialis*, *Korethraster hispidus*, *Pteraster militaris*, *Ophiura sarsii*, *Strongylocentrotus droebachiensis*, *Ophiopus* sp., *Ophiopus articus*, *Ophiocten* sp., *Psilaster andromeda*, *Asteroidea* sp., *Amphiura* sp., *Pontaster* sp., *Ophiura* sp.
+
+
+**Biomass**: 
+
+Following Janjua et al 2015, I considered the biomass estimate of 10.3 ton/km2 calculated from estimates by Thomson (1982) of standing crop of infaunal benthos at different depth range and their relative composition as a function of depth (mean % of total biomass) in the central Baffin Bay. 
+
+
+**P/B and Q/B**: 
+
+First I used values for P/B and Q/B from Hoover al 2013, based on values from the Weddel Sea model by Jarre-Teichmann et al 1997 (0.165 and 0.63 year-1 respectively). Yet, these seemed very low so I changed to the values she used for the Beaufort Sea model (Hoover et al 2021).  
+
+From the Greenland halibut fishery, in 2015 the bycatch of echinoderms was 2.2 tonnes, yielding a harvest of 3.56292E-05 tonnes/km2/year (area 61747.07165 km2) from Jorgensen and Treble 2016.
+
+
+**Diet composition**:  3.5 % Omnivorous zooplankton, 4.5% Carnivorous zooplankton, 1% Calanus, 3% microzooplankton, 10% marine worms, 1% echinoderms, 10% bivalves, 15% other benthos, 3% phytoplankton, 8% ice algae, 41 %  detritus
+
+
+Echinoderm diet varies widely depending on class/species. Crinoids are mainly filter feeders, Asteroids can be predators or scavengers, Ophiuroids can be predators, scavengers, deposit and filter feeders, Echinoids can be predators, herbivores and filter feeders, and Holothutians can be deposit or filter feeders.
+
+I will adapt the diet composition from Hoover et al 2013 for this group, based on the Weddel Sea model by Jarre-Teichmann et al 1997:
+
+1% euphausiids, 2% copepods, 5% crustaceans, 1% other meso- zooplankton, 3% micro-zooplankton, 10% marine worms, 1% echinoderms, 10% bivalves, 15% other benthos, 3% pelagic production, 8% ice algae, 41 % ice detritus
+
+
+
+## Polychaetes
+
+From GreenEdge, marine worms species sampled included:
+
+*Ampharete finmarchica*, *Nicolea* sp., *Jasmineira* sp., *Jasmineira shaudinni*, *Owenia fusiformis*, *Galathowenia, oculata*, *Amphicteis gunneri*, *Goniada novegica*, *Aglaophamus malmgreni*, *Leaena abranchiata*, *Chone* sp., *Harmothoe* sp., *Lumbrinereis tenuis*, *Nothria conchylega*, *Euchone* sp., *Euchone analis*, *Ophelina abranchiata*, *Ampharete* sp., *Maldane* sp., *Amage* sp., *Euphrosine cirrata*, *Harmothoe nodosa*, *Harmothoe oerstedi*, *Leanira tetragona*, *Brada villosa*, *Spiochaetopterus typicus*, *Pista maculata*, *Terebellides stroemi*, *Axione maculata*, *Clymenura borealis*, *Nicomache* sp., *Neoamphitrite groenlandica*, *Placostegus tridentatus*, *Eunice pennata*, *Platynereis* sp., *Glycera capitata*, *Anonyx nugax*, *Polyphysia crassa *, *Laetmonice filicornis filicornis*, *Sipunculidea* sp., *Phascolion strombus*
+
+Polycheate worms are the most dominant group along with bivalve among marine benthos in the Eastern Canadian high Arctic. Sipunculid worms are also important at greater depths (Thomson 1982). Maldanid polychaetes and sabellid polychaetes are most common in the study area (in Janjua et al 2015)
+
+
+
+**Biomass**: 
+
+Polycheate and sipunculid worms biomass was calculated from estimates of standing crop of infaunal benthos at different depth range and relative composition as a function of depth (mean % of total biomass) in the Baffin Bay (Thomson 1982).
+
+I used the biomass values in Janjua's model of 18.1 ton/km2.
+
+
+**P/B**: 
+
+I used the same P/B as Janjua et al 2015 did based on a mean of the value estimated by Curtis (1977) of 1.4 yr-1 for the polychaetes off West Greenland, and Hoover's value of 0.6 yr-1 marine worms groups (this one based on the Weddell Sea model).  
+
+
+**Q/B**: 
+
+I used values for Q/B from Hoover al 2013, based on values from the Weddel Sea model by Jarre-Teichmann et al 1997. 
+
+
+**Diet composition**:  1% Calanus, 4% Omnivorous zooplankton, 3% Carnivorous zooplankton, 3% microzooplankton, 1% marine worms, 1% echinoderms, 10% other benthos, 4% phytoplankton, 12% ice algae, 61% detritus
+
+I will adapt the diet composition from Hoover et al 2013 for this group, based on the Weddel Sea model by Jarre-Teichmann et al 1997:
+
+1% macro-zooplankton, 1% euphausiids, 3% copepods, 1% crus- taceans, 2% other meso-zooplankton, 3% micro-zooplankton, 1% marine worms, 1% echinoderms, 10% other benthos, 4% pelagic production, 12% ice algae, and 61% ice detritus
+
+
+
+## Other benthos
+
+From the Amundsen Science, marine worm species sampled included:
+
+Sponges (Porifera):
+
+*Radiella hemisphaerica*, *Geodia macandrewii*, *Polymastia* sp., *Geodia barretti*, *Thenea muricata*, *Tentorium semisuberites*, *Rhizaxinella* sp., *Melonanchora elliptica*, Phidoloporidae, *Craniella cranium*, *Asconema* sp.
+
+
+Anemonies etc. (Cnidaria):
+
+*Bolocera tuediae*, *Actinostola callosa*, *Lifonema multicorne*, *Actinauge cristata*, *Pennatula grandis*, *Drifa glomerata*, *Anthoptilum grandiflorum *, *Actiniaria* sp., *Cladocarpus intiger*, *Abietinaria* sp., *Lafoea* sp., *Thuiaria* sp., *Anemone* sp., *Duva florida*, *Aglaophenopsis cornuta*, *Diphasia* sp., *Acanthogorgia armata*
+
+
+**Biomass**
+
+The biomass was calculated as 13.4 ton km-2 of other benthos (G. Yunda-Guarin, unpublished data).
+
+**P/B**: 
+
+I used values for P/B from Hoover al 2013, based on models from Gulf of Alaska, Kerguelen Islands and Newfoundland (Heymans, 2003, 2005; Pruvost et al 2005). 
+
+From the Greenland halibut fishery, in 2015 the bycatch of other benthos was 1.5 tonnes, yielding a harvest of 2.42927E-05 tonnes/km2/year (area 61747.07165 km2) from Jorgensen and Treble 2016.
+
+
+**Q/B**: 
+
+I used values for Q/B from Hoover al 2013, based on models from Gulf of Alaska, Kerguelen Islands and Newfoundland (Heymans, 2003, 2005; Pruvost et al 2005). 
+
+**Diet composition**: 1% Omnivorous zooplankton, 1% Carnivorous zooplankton, 1% microzooplankton, 1% marine worms, 1% echinoderms, 1% bivalves, 1% other benthos, 5% phytoplankton, 22% ice algae, and 66% detritus
+
+I adapted the diet composition from Hoover et al 2013 for this group, based on Heymans, 2003, 2005; Pruvost et al 2005:
+
+1% macro-zooplankton, 1% other meso-zooplankton, 1% micro- zooplankton, 1% marine worms, 1% echinoderms, 1% bivalves, 1% other benthos, 5% pelagic production, 22% ice algae, and 66% ice detritus
+
+

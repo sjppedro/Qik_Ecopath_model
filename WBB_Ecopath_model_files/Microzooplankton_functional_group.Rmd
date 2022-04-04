@@ -1,0 +1,112 @@
+---
+title: "Microzooplankton-parameters"
+author: "Sara Pedro"
+date: "20/05/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo =FALSE, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(readxl) # Load the readxl package
+
+
+setwd("C:/Users/Sara/Google Drive/PostDoc-QC/Data gathering/R_ttt") #set your working directory here
+
+```
+
+The full citation corresponding to the literature cited in this file can be found in the Ecopath technical report for this project.
+
+
+## Basic input
+
+#### Opensource data from GreenEdge Project
+
+https://www.seanoe.org/data/00487/59892/
+
+The data for microzooplakton was treated by Saint-Béat et al 2020. Here I show a bit of the data from her original files and converted it to the units in my model.
+The diet composition of microzooplankton is in the Zooplankton_parameters file.
+
+
+**Biomass**: 
+
+
+```{r}
+
+#Saint-Béat et al 2020 calculated the min and max biomass for microzooplankton based on data from Amundsen Science and GreenEdge project (see file Biomass_MIC.xlsx). The units for flagellates and ciliates are pgC/m2 based on conversions from Menden-Deuer & Lessard 2000 (from the formula  pgC/cell = 0.216 *(volume)^0.939); the units for nauplii are in ugC/m2 and were calculated based on the same formulas used for zooplankton, that is calculating bodymass from size of different species.
+
+biomass_min_flagellates <- 3.01e+08
+biomass_max_flagellates <- 1.34e+09
+
+biomass_min_ciliates <- 2.21e+09
+biomass_max_ciliates <- 1.26e+11
+
+biomass_min_nauplii <- 1773.920259*1e+6 #convert to pgC/m2
+biomass_max_nauplii <- 9792.173696*1e+6
+
+
+biomass_MIC_pgC_m2 <- (biomass_min_flagellates + biomass_max_flagellates)/2 + (biomass_min_ciliates+biomass_max_ciliates)/2 + (biomass_min_nauplii+biomass_max_nauplii)/2
+
+biomass_MIC_min_pgC_m2 <- biomass_min_ciliates+biomass_min_flagellates+biomass_min_nauplii
+biomass_MIC_max_pgC_m2 <- biomass_max_ciliates+biomass_max_flagellates+biomass_max_nauplii
+
+```
+
+
+```{r}
+#Convert pgC/m2 to tonww/km2 - I am assuming the same conversion factor as for bacteria (from protozoa in North Sea models Report - 1 gww = 0.165 gC (DeLaca 1985))
+
+biomass_MIC <- biomass_MIC_pgC_m2/0.165*1e-18/1e-6 
+
+biomass_MIC_min <-biomass_MIC_min_pgC_m2/0.165*1e-18/1e-6
+biomass_MIC_max <- biomass_MIC_max_pgC_m2/0.165*1e-18/1e-6
+
+#I am assuming a constant biomass the whole year
+
+
+```
+
+
+**P/B and Q/B**: 
+
+
+```{r}
+flow<-read.csv("Flows_values.csv") %>%
+      select(flows,WBB)%>%
+      separate(flows,into=c("from","to"),sep="->",remove=T)
+      
+pdct<- filter(flow, !to %in% c("DOC","DET", "RES"))%>%
+        group_by(from)%>%
+       summarise(pdct=sum(WBB)) %>%
+         mutate(Group_abb = from) # for microzooplankton is 0.577 gC per square meter per month
+
+conso<-group_by(flow, to)%>%
+       summarise(conso=sum(WBB)) %>%
+      mutate(Group_abb = to) # for microzooplankton is 1.775 gC per square meter per month
+
+# conversion from gC/sqm/month to tonWw/sqkm/year
+
+pdtc_mic <- 0.577/0.165*4 #assuming microzooplankton produces and consumes only in summer months
+
+conso_mic <- 1.775/0.165*4
+
+# calculate P/B and Q/B 
+
+PB_mic <- pdtc_mic/biomass_MIC 
+QB_mic <- conso_mic/biomass_MIC
+
+
+PB_mic_max <- pdtc_mic/biomass_MIC_max
+QB_mic_max <- conso_mic/biomass_MIC_max
+
+ 
+
+
+```
+
+
